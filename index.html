@@ -427,12 +427,52 @@ const money=n=>{const s=S.settings.cur||'₽';return S.settings.curPos==='before
    будет общий топ. Или оставь пустым и введи их в Настройках (тогда только у тебя). */
 const ONLINE={fn:'https://bpsgmrhlksiijodnbtqq.supabase.co/rest/v1/rpc/vozduh',key:'sb_publishable_Wie5BO9uNd3p4iOwustMXA_RX0RJPcr',bot:'vozduhgamebot'};
 const TG=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)?Telegram.WebApp:null;
-var CLOUD={ready:false,t:null,busy:false};
+var CLOUD={ready:false,t:null,busy:false,rev:null};
+/* одинаковые правила для всех + лимиты, чтобы нельзя было нафармить */
+const FIXED={win:60,mainElo:80,sideElo:15,eloTask:3,eloRoutine:2,eloStep:5,perfectBonus:25,eloStart:1000,streakMult:true,relapsePen:10,focusRate:1};
+const CAPS={eloCat:20,eloDay:60,eloQuest:100,coinCat:150,coinDay:500,coinQuest:500,coinBonus:200};
+let LASTC=null;
+let ADM={admin:false,banned:false,ann:'',adj:[],luck:{add:0,phase:null}};try{const a=JSON.parse(localStorage.getItem('vozduh_adm'));if(a)ADM={...ADM,...a}}catch(e){}
+let CFG={};try{CFG=JSON.parse(localStorage.getItem('vozduh_cfg'))||{}}catch(e){CFG={}}
+let DEF=null;
+const saveCFG=()=>{try{localStorage.setItem('vozduh_cfg',JSON.stringify(CFG))}catch(e){}};
+/* глобальные настройки игры от админа поверх стандартных */
+function applyCFG(){
+  if(!DEF)DEF=JSON.parse(JSON.stringify({caps:CAPS,fixed:FIXED,mrew:MREW,arew:AREW,cases:CASES,seasonMonths:SEASON_MONTHS,seasonEpoch:SEASON_EPOCH}));
+  const c=CFG||{};
+  Object.assign(CAPS,DEF.caps,c.caps||{});Object.assign(FIXED,DEF.fixed,c.fixed||{});Object.assign(MREW,DEF.mrew,c.mrew||{});Object.assign(AREW,DEF.arew,c.arew||{});
+  const src=Array.isArray(c.cases)&&c.cases.length?c.cases:DEF.cases;CASES.length=0;JSON.parse(JSON.stringify(src)).forEach(x=>CASES.push(x));
+  CASES.forEach(x=>{const pr=(c.casePrice||{})[x.id];if(pr!==undefined&&pr!=='')x.cost=Math.max(0,+pr||0)});
+  SEASON_MONTHS=Math.max(1,+c.seasonMonths||DEF.seasonMonths);SEASON_EPOCH=/^\d{4}-\d{2}-\d{2}$/.test(c.seasonEpoch||'')?c.seasonEpoch:DEF.seasonEpoch;
+  if(typeof S!=='undefined'&&S&&S.settings){Object.assign(S.settings,FIXED);S.metrics&&S.metrics.forEach(m=>{m.coins=MREW.coins;m.elo=MREW.elo});S.anti&&S.anti.forEach(a=>{a.coinsPer=AREW.coins;a.eloPer=AREW.elo})}
+}
+const setRev=r=>{CLOUD.rev=+r||0;try{localStorage.setItem('vozduh_rev',String(CLOUD.rev))}catch(e){}};
+const gameOn=k=>((CFG||{}).games||{})[k]!==false;
+const saveADM=()=>{try{localStorage.setItem('vozduh_adm',JSON.stringify(ADM))}catch(e){}};
+const CATDEF=[['yt','YouTube / контент','YouTube / content','#ff5c5c'],['work','Работа','Work','#5aa9ff'],['biz','Бизнес и деньги','Business & money','#ffc800'],
+  ['study','Учёба','Study','#7c8cff'],['lang','Языки','Languages','#c38bff'],['read','Чтение','Reading','#a3e635'],['body','Спорт','Sport','#3ddc84'],
+  ['health','Здоровье и сон','Health & sleep','#2dd4bf'],['food','Питание','Nutrition','#fb923c'],['mind','Ментал и медитация','Mind & meditation','#8be9d0'],
+  ['creative','Творчество','Creativity','#ff5cd6'],['home','Быт и порядок','Home & chores','#60a5fa'],['social','Люди и семья','People & family','#f472b6'],
+  ['hobby','Хобби','Hobbies','#facc15'],['other','Другое','Other','#8a9bb0']];
+const catList=lang=>CATDEF.map(([id,ru,en,color])=>({id,name:lang==='en'?en:ru,color}));
+const CATIDS=new Set(CATDEF.map(c=>c[0]));
+/* дисциплина: фиксированная награда и разумные цели, чтобы не ставить «10 шагов» */
+const MREW={coins:10,elo:3},AREW={coins:10,elo:3};
+const MKEYS={wake:{t:'06:00',lim:['le','09:00']},bed:{t:'23:30',lim:['bed']},kcal:{t:2000,lim:['le',3500]},steps:{t:10000,lim:['ge',6000]},
+  water:{t:2,lim:['ge',1.5]},screen:{t:3,lim:['le',6]},sleep:{t:8,lim:['ge',7]},train:{t:30,lim:['ge',20]},readp:{t:20,lim:['ge',10]},medit:{t:10,lim:['ge',5]}};
+const MALT={wake:['подъём','подъем','wake up'],bed:['отбой','bedtime'],sleep:['сон','sleep'],steps:['шаги','steps'],kcal:['калории','calories'],water:['вода','water'],screen:['экранное время','screen time'],train:['тренировка','workout'],readp:['чтение','reading'],medit:['медитация','meditation']};
+const tmn=(v,ev)=>{const[h,mi]=String(v).split(':').map(Number);let x=(h||0)*60+(mi||0);if(ev&&x<12*60)x+=1440;return x};
+function mFix(m){const k=MKEYS[m.key];m.coins=MREW.coins;m.elo=MREW.elo;if(!k)return m;const[l,v]=k.lim;
+  if(l==='bed'){m.kind='time';m.dir='le';const x=tmn(m.target,true);if(!(x>=21*60&&x<=25*60))m.target=k.t}
+  else if(m.kind==='time'){m.dir=l;if(tmn(m.target)>tmn(v))m.target=v}
+  else{m.kind='num';m.dir=l;const n=+m.target||0;if(l==='ge'&&n<v)m.target=v;if(l==='le'&&(n>v||n<=0))m.target=v}
+  return m}
+const OKDAY=d=>d>=add(today(),-1);
 let LOGIN=null;if(!TG){try{const l=JSON.parse(localStorage.getItem('vozduh_tglogin'));if(l&&l.id&&l.hash&&Date.now()/1000-(+l.auth_date||0)<29*86400)LOGIN=l}catch(e){}}
 const ONL=()=>!!(TG||LOGIN);
 
 /* ============ сезоны ============ */
-const SEASON_EPOCH='2026-11-01',SEASON_MONTHS=2;
+let SEASON_EPOCH='2026-11-01',SEASON_MONTHS=3;
 function seasonOf(s){const d=pd(s),e=pd(SEASON_EPOCH);const m=(d.getFullYear()-e.getFullYear())*12+d.getMonth()-e.getMonth();return m<0?0:Math.floor(m/SEASON_MONTHS)+1}
 function seasonRange(n){const e=pd(SEASON_EPOCH);if(n<=0)return{start:null,end:add(SEASON_EPOCH,-1)};return{start:ds(new Date(e.getFullYear(),e.getMonth()+(n-1)*SEASON_MONTHS,1)),end:ds(new Date(e.getFullYear(),e.getMonth()+n*SEASON_MONTHS,0))}}
 const seasonName=n=>n<=0?L('Предсезон','Pre-season'):L(`Сезон ${n}`,`Season ${n}`);
@@ -521,7 +561,7 @@ function applyTheme(){
 function R(title,cat,coins,freq,o={}){return{id:uid(),title,cat,coins,freq,days:[],every:2,mday:1,bonus7:0,created:today(),archivedAt:null,...o}}
 function seed(lang){
   const t=today(),en=lang==='en',T=(a,b)=>en?b:a;
-  const cats=[['yt','YouTube','#ff5c5c'],['body',T('Тело','Body'),'#3ddc84'],['biz',T('Бизнес','Business'),'#ffc800'],['home',T('Быт','Home'),'#5aa9ff'],['lang',T('Языки','Languages'),'#c38bff']].map(([id,name,color])=>({id,name,color}));
+  const cats=catList(lang);
   return{v:2,start:t,cats,tasks:[],
     routines:[
       R(T('Тренировка / зарядка','Workout'),'body',10,'daily',{bonus7:40}),
@@ -549,13 +589,16 @@ function seed(lang){
 function normalize(d){
   d.settings={win:60,mainElo:50,sideElo:10,eloStart:1000,anim:'random',lang:'ru',cur:'₽',curPos:'after',theme:'mint',fast:false,focusWork:25,focusBreak:5,focusRate:1,eloTask:3,eloRoutine:2,eloStep:5,perfectBonus:25,streakMult:true,...(d.settings||{})};if(!d.settings.eloV2){if(d.settings.mainElo===50)d.settings.mainElo=80;if(d.settings.sideElo===10)d.settings.sideElo=15;d.settings.eloV2=true}d.luckHist=Array.isArray(d.luckHist)?d.luckHist:[];
   d.ach=d.ach||{};d.rlog=d.rlog||{};d.upg=d.upg||[];d.cases=d.cases||[];d.grant=0;
-  d.inv={themes:['mint'],shield:0,bgs:[],...(d.inv||{})};if(!Array.isArray(d.inv.bgs))d.inv.bgs=[];d.anti=Array.isArray(d.anti)?d.anti:[];d.metrics=Array.isArray(d.metrics)?d.metrics:[];d.settings.bg=d.settings.bg||'none';d.profile={nick:'',ava:'',ava48:'',...(d.profile||{})};if(!d.profile.id)d.profile.id=uid()+uid();d.cards=Array.isArray(d.cards)?d.cards:[];d.friends=Array.isArray(d.friends)?d.friends:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.games=Array.isArray(d.games)?d.games:[];d.net={key:'',db:'',uid:'',refresh:'',idToken:'',exp:0,...(d.net||{})};if(!d.inv.themes.includes('mint'))d.inv.themes.unshift('mint');d.settings.testUnlock=false;if(!d.inv.themes.includes(d.settings.theme))d.settings.theme='mint';if(d.settings.bg!=='none'&&!d.inv.bgs.includes(d.settings.bg))d.settings.bg='none';
+  d.inv={themes:['mint'],shield:0,bgs:[],...(d.inv||{})};if(!Array.isArray(d.inv.bgs))d.inv.bgs=[];d.anti=Array.isArray(d.anti)?d.anti:[];d.metrics=Array.isArray(d.metrics)?d.metrics:[];d.settings.bg=d.settings.bg||'none';d.profile={nick:'',ava:'',ava48:'',...(d.profile||{})};if(!d.profile.id)d.profile.id=uid()+uid();d.cards=Array.isArray(d.cards)?d.cards:[];d.friends=Array.isArray(d.friends)?d.friends:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.games=Array.isArray(d.games)?d.games:[];d.net={key:'',db:'',uid:'',refresh:'',idToken:'',exp:0,...(d.net||{})};if(!d.inv.themes.includes('mint'))d.inv.themes.unshift('mint');d.settings.testUnlock=false;Object.assign(d.settings,FIXED);d.cats=catList(d.settings.lang);
+  const fc=x=>{if(x&&x.cat!==undefined&&x.cat!==''&&!CATIDS.has(x.cat))x.cat='other'};(d.tasks||[]).forEach(fc);(d.routines||[]).forEach(fc);(d.quests||[]).forEach(fc);(d.rewards||[]).forEach(fc);
+  d.metrics.forEach(m=>{if(!m.key){const tt=String(m.title).trim().toLowerCase();const k=Object.keys(MALT).find(k=>MALT[k].includes(tt));if(k)m.key=k}mFix(m)});
+  d.anti.forEach(a=>{a.coinsPer=AREW.coins;a.eloPer=AREW.elo});if(!d.inv.themes.includes(d.settings.theme))d.settings.theme='mint';if(d.settings.bg!=='none'&&!d.inv.bgs.includes(d.settings.bg))d.settings.bg='none';
   return d;
 }
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
 if(!S||!Array.isArray(S.routines))S=seed((navigator.language||'ru').toLowerCase().startsWith('ru')?'ru':'en');
-normalize(S);save();
+applyCFG();normalize(S);save();
 function save(){if(ONL()&&CLOUD.ready){S.savedAt=Date.now();cloudSched()}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 let UI={bt:'hub',gbusy:false,gs:{crash:50,roul:50,bj:50},cr:{state:'idle',m:1,el:0,auto:2,useAuto:false,hist:[]},ro:{bet:'r',hist:[],last:null},bj:{state:'idle',p:[],d:[]},lb:{view:'all'},focusOpen:false,netErr:'',tab:'home',week:mondayOf(today()),tagF:[],sideView:'open',hl:null,sound:true,busy:false,lastDrop:null,u:{mode:'x',mult:2,stake:50,target:null,rot:180,spinning:false}};
 try{const u=JSON.parse(localStorage.getItem(KEY+'_ui'));if(u&&u.tab)UI.tab=u.tab;if(u&&u.sound===false)UI.sound=false}catch(e){}
@@ -605,37 +648,43 @@ function compute(){
   const t=today(),tByD={};
   S.tasks.forEach(x=>(tByD[x.date]??=[]).push(x));
   const C={tByD,matches:{},series:[],earned:0,coinsByDay:{},catCoins:{}};
-  const addC=(d,n,c)=>{n=+n||0;C.coinsByDay[d]=(C.coinsByDay[d]||0)+n;C.earned+=n;if(c!==undefined){C.catCoins[d]??={};C.catCoins[d][c]=(C.catCoins[d][c]||0)+n}};
+  const RAW={};const addC=(d,n,c,b)=>{n=+n||0;if(!n)return;const k=b||('c:'+(c||'_'));(RAW[d]??={})[k]=(RAW[d][k]||0)+n};
   S.tasks.forEach(x=>{if(x.done)addC(x.date,x.coins,x.cat)});
   const rmap=Object.fromEntries(S.routines.map(r=>[r.id,r]));
   for(const d in S.rlog)for(const id in S.rlog[d])if(S.rlog[d][id]&&rmap[id])addC(d,rmap[id].coins,rmap[id].cat);
-  S.quests.forEach(q=>{if(q.done)addC(q.doneDate||t,q.coins,q.cat)});
-  S.sides.forEach(q=>{if(q.status==='done')addC(q.doneDate||t,q.coins)});
-  (S.anti||[]).forEach(a=>{const st=a.created>S.start?a.created:S.start;for(let d=st;d<t;d=add(d,1)){if(!(a.relapses||[]).includes(d))addC(d,a.coinsPer)}});
-  (S.metrics||[]).forEach(m=>{for(const d in (m.log||{}))if(mHit(m,d))addC(d,m.coins)});
-  S.focus.forEach(f=>addC(f.date,Math.round((+f.min||0)*(+S.settings.focusRate||1))));
+  S.quests.forEach(q=>{if(q.done)addC(q.doneDate||t,q.coins,q.cat,'q')});
+  S.sides.forEach(q=>{if(q.status==='done')addC(q.doneDate||t,q.coins,null,'q')});
+  (S.anti||[]).forEach(a=>{const st=a.created>S.start?a.created:S.start;for(let d=st;d<t;d=add(d,1)){if(!(a.relapses||[]).includes(d))addC(d,a.coinsPer,'_anti')}});
+  (S.metrics||[]).forEach(m=>{for(const d in (m.log||{}))if(mHit(m,d))addC(d,m.coins,'_metric')});
+  S.focus.forEach(f=>addC(f.date,Math.round((+f.min||0)*(+S.settings.focusRate||1)),'_focus'));
   C.bonus=[];
   S.routines.filter(r=>r.freq==='daily'&&+r.bonus7>0).forEach(r=>{
     for(let m=mondayOf(r.created);m<=t;m=add(m,7)){
       let ok=true;for(let i=0;i<7;i++){const d=add(m,i);if(!due(r,d)||!(S.rlog[d]||{})[r.id]){ok=false;break}}
-      if(ok){addC(add(m,6),r.bonus7,r.cat);C.bonus.push({r:r.id,week:m})}
+      if(ok){addC(add(m,6),r.bonus7,r.cat,'b');C.bonus.push({r:r.id,week:m})}
     }
   });
+  for(const d in RAW){const R0=RAW[d],cc={};let cs=0;for(const k in R0)if(k.startsWith('c:')){const v=Math.min(CAPS.coinCat,R0[k]);cc[k.slice(2)]=v;cs+=v}
+    const day=Math.min(CAPS.coinDay,cs)+Math.min(CAPS.coinQuest,R0.q||0)+Math.min(CAPS.coinBonus,R0.b||0);
+    C.coinsByDay[d]=day;C.earned+=day;C.catCoins[d]=Object.fromEntries(Object.entries(cc).filter(([k])=>k[0]!=='_'))}
   C.spent=S.buys.reduce((a,b)=>a+(+b.coins||0),0);
   C.upgNet=S.upg.reduce((a,u)=>a+(u.win&&u.mode==='x'?(+u.payout||0):0)+(+u.refund||0)-(+u.stake||0),0);
   C.caseNet=S.cases.reduce((a,c)=>a+(+c.coins||0)-(+c.cost||0),0);
   C.grant=+S.grant||0;
   C.gameNet=S.games.reduce((a,g)=>a+(+g.payout||0)-(+g.stake||0),0);
-  C.balance=C.earned-C.spent+C.upgNet+C.caseNet+C.gameNet+C.grant;
+  C.adjCoins=(ADM.adj||[]).reduce((a,x)=>a+(+x.coins||0),0);
+  C.balance=C.earned-C.spent+C.upgNet+C.caseNet+C.gameNet+C.grant+C.adjCoins;
   const E0=+S.settings.eloStart||1000;let elo=E0;const bonus={};
   S.quests.forEach(q=>{if(q.done){const d=q.doneDate||t;bonus[d]=(bonus[d]||0)+(+S.settings.mainElo||0)}});
   S.sides.forEach(q=>{if(q.status==='done'){const d=q.doneDate||t;bonus[d]=(bonus[d]||0)+(+S.settings.sideElo||0)}});
-  const item={},addI=(d,n)=>{item[d]=(item[d]||0)+(+n||0)};
-  S.tasks.forEach(x=>{if(x.done)addI(x.date,S.settings.eloTask)});
-  for(const d in S.rlog)for(const id in S.rlog[d])if(S.rlog[d][id]&&rmap[id])addI(d,S.settings.eloRoutine);
-  S.quests.forEach(q=>q.steps.forEach(st=>{if(st.done&&st.doneAt)addI(st.doneAt,S.settings.eloStep)}));
-  (S.anti||[]).forEach(a=>{const st=a.created>S.start?a.created:S.start;for(let d=st;d<t;d=add(d,1)){if((a.relapses||[]).includes(d))addI(d,-(+S.settings.relapsePen||10));else addI(d,a.eloPer)}if((a.relapses||[]).includes(t))addI(t,-(+S.settings.relapsePen||10))});
-  (S.metrics||[]).forEach(m=>{for(const d in (m.log||{}))if(d>=S.start&&mHit(m,d))addI(d,+m.elo||0)});
+  const adjE={};(ADM.adj||[]).forEach(x=>{if(!+x.elo)return;let d=ds(new Date(x.at));if(d<S.start)d=S.start;if(d>t)d=t;adjE[d]=(adjE[d]||0)+(+x.elo)});
+  const item={},addI=(d,n,c)=>{n=+n||0;if(!n)return;const o=item[d]??={pos:{},neg:0};if(n<0)o.neg+=n;else{const k=c||'_';o.pos[k]=(o.pos[k]||0)+n}};
+  const itemVal=d=>{const o=item[d];if(!o)return 0;let v=0;for(const k in o.pos)v+=Math.min(CAPS.eloCat,o.pos[k]);return Math.min(CAPS.eloDay,v)+o.neg};
+  S.tasks.forEach(x=>{if(x.done)addI(x.date,S.settings.eloTask,x.cat)});
+  for(const d in S.rlog)for(const id in S.rlog[d])if(S.rlog[d][id]&&rmap[id])addI(d,S.settings.eloRoutine,rmap[id].cat);
+  S.quests.forEach(q=>q.steps.forEach(st=>{if(st.done&&st.doneAt)addI(st.doneAt,S.settings.eloStep,q.cat)}));
+  (S.anti||[]).forEach(a=>{const st=a.created>S.start?a.created:S.start;for(let d=st;d<t;d=add(d,1)){if((a.relapses||[]).includes(d))addI(d,-(+S.settings.relapsePen||10));else addI(d,a.eloPer,'_anti')}if((a.relapses||[]).includes(t))addI(t,-(+S.settings.relapsePen||10))});
+  (S.metrics||[]).forEach(m=>{for(const d in (m.log||{}))if(d>=S.start&&mHit(m,d))addI(d,+m.elo||0,'_metric')});
   const PB=+S.settings.perfectBonus||0;C.todayItems=0;C.mult=1;
   C.seasons={};let sn=null,peakAll=E0;
   const SS=n=>C.seasons[n]??={n,elo:E0,peak:E0,wins:0,losses:0,best:0,cur:0,matches:0,earned:0};
@@ -647,7 +696,7 @@ function compute(){
     if(i.p){const ratio=i.dn/i.p;const m={d,s,ratio,win:ratio>=S.settings.win/100,delta:eloDelta(ratio),live:d===t,mult};C.matches[d]=m;
       const full=m.win?Math.round(m.delta*mult)+(ratio>=1?Math.round(PB*mult):0):m.delta;
       if(!m.live){m.dElo=full;elo+=full;ss.matches++;if(m.win){ss.wins++;ss.cur++;ss.best=Math.max(ss.best,ss.cur)}else{ss.losses++;ss.cur=0}}else m.proj=full}
-    const gain=Math.round(((item[d]||0)+(bonus[d]||0))*mult);elo+=gain;
+    const gain=Math.round((itemVal(d)+Math.min(CAPS.eloQuest,bonus[d]||0))*mult);elo+=gain+(adjE[d]||0);
     if(d===t){C.todayItems=gain;C.mult=mult}
     elo=Math.max(100,elo);ss.peak=Math.max(ss.peak,elo);ss.elo=elo;peakAll=Math.max(peakAll,elo);ss.earned+=C.coinsByDay[d]||0;
     C.series.push({d,elo,s});
@@ -660,8 +709,13 @@ function compute(){
   closed.forEach(m=>{if(m.win){cur++;best=Math.max(best,cur);if(lossRun>=3)C.comeback=true;lossRun=0}else{cur=0;lossRun++}if(m.ratio>=1)C.perfect=true});
   C.bestAll=best;C.wins=closed.filter(m=>m.win).length;C.streak=cs.cur;C.best=cs.best;
   const wp=C.series.find(p=>p.d===add(mondayOf(t),-1));C.weekDelta=C.elo-((wp&&wp.s===C.sn)?wp.elo:E0);
-  return C;
+  const it=item[t]||{pos:{},neg:0};C.capT={elo:it.pos,eloSum:Object.values(it.pos).reduce((a,v)=>a+Math.min(CAPS.eloCat,v),0),quest:bonus[t]||0,coins:{},coinSum:0};
+  for(const k in (RAW[t]||{}))if(k.startsWith('c:')){C.capT.coins[k.slice(2)]=RAW[t][k];C.capT.coinSum+=Math.min(CAPS.coinCat,RAW[t][k])}
+  LASTC=C;return C;
 }
+/* сколько ELO реально даст отметка (с учётом лимитов) */
+function eloLeft(c,n){const T=LASTC&&LASTC.capT;if(!T)return n;const k=c||'_';const catLeft=CAPS.eloCat-(T.elo[k]||0),dayLeft=CAPS.eloDay-T.eloSum;return Math.max(0,Math.min(n,catLeft,dayLeft))}
+function capFloat(b,n,c){const v=eloLeft(c,n);eloFloat(b,v);if(v<n)toast(v?L('⚠️ Почти лимит ELO на сегодня','⚠️ Almost at today\'s ELO limit'):L('🧢 Лимит ELO на сегодня по этой категории — дальше только монеты (тоже до лимита)','🧢 Today\'s ELO cap for this category reached'))}
 function rStreak(r){
   let n=0,d=today();
   if(!(S.rlog[d]||{})[r.id])d=add(d,-1);
@@ -705,10 +759,12 @@ function checkAch(C){
 }
 
 /* ============ рендер ============ */
-const TABS=()=>[['home',L('Главная','Home')],['week',L('Неделя','Week')],['routine',L('Рутина','Routine')],['disc',L('Дисциплина','Discipline')],['quests',L('Квесты','Quests')],['shop',L('Магазин','Shop')],['burm',L('Бурмалда','Burmalda')],['top',L('Топ','Top')],['profile',L('Профиль','Profile')],['settings',L('Настройки','Settings')]];
+const TABS=()=>[['home',L('Главная','Home')],['week',L('Неделя','Week')],['routine',L('Рутина','Routine')],['disc',L('Дисциплина','Discipline')],['quests',L('Квесты','Quests')],['shop',L('Магазин','Shop')],['burm',L('Бурмалда','Burmalda')],['top',L('Топ','Top')],['profile',L('Профиль','Profile')],['settings',L('Настройки','Settings')],...(ADM.admin&&ONL()?[['admin',L('Админ','Admin')]]:[])];
 let lastLvl=null,lastLive=null,lastBonus=null;
 function render(){
   applyTheme();
+  {const cl=catList(S.settings.lang);if(!S.cats.length||S.cats[0].name!==cl[0].name||S.cats.length!==cl.length)S.cats=cl}
+  if(UI.tab==='admin'&&!ADM.admin)UI.tab='home';
   const C=compute();
   checkAch(C);
   const L0=lvl(C.elo);
@@ -722,12 +778,12 @@ function render(){
   if(S.seasonSeen==null){S.seasonSeen=C.sn;save()}
   else if(C.sn>S.seasonSeen){const old=C.seasons[S.seasonSeen];S.seasonSeen=C.sn;save();UI.reportChecked=true;if(old&&old.matches)setTimeout(()=>seasonModal(old),600)}
   if(!UI.reportChecked){UI.reportChecked=true;checkReport(C)}
-  $('#tabs').innerHTML=TABS().map(([k,n])=>`<button data-tab="${k}" title="${n}" class="${UI.tab===k?'on':''}">${ic({home:'nav_home',week:'nav_week',routine:'nav_routine',disc:'ui_habit',quests:'nav_quests',shop:'nav_shop',burm:'nav_burmalda',top:'nav_top',profile:'nav_profile',settings:'nav_settings'}[k],20)}<span class="lbl">${n}</span></button>`).join('');
+  $('#tabs').innerHTML=TABS().map(([k,n])=>`<button data-tab="${k}" title="${n}" class="${UI.tab===k?'on':''}">${ic({home:'nav_home',week:'nav_week',routine:'nav_routine',disc:'ui_habit',quests:'nav_quests',shop:'nav_shop',burm:'nav_burmalda',top:'nav_top',profile:'nav_profile',settings:'nav_settings'}[k],20)||(k==='admin'?'🛠':'')}<span class="lbl">${n}</span></button>`).join('');
   const toNext=L0.n===10?L('макс. уровень','max level'):L(`до ${L0.n+1} лвл: ${L0.max+1-C.elo}`,`to lvl ${L0.n+1}: ${L0.max+1-C.elo}`);
   const live=C.live||C.todayItems?`<span class="pill ${C.today>=0?'w':'l'}" title="${L('Сегодня: за дела','Today: tasks')} ${sign(C.todayItems||0)}${C.live?' · '+L('матч','match')+' '+sign(C.live.proj||0):''}${C.mult>1?' · ×'+C.mult.toFixed(1):''}">${ic(C.today>=0?'ui_elo_up':'ui_elo_down',14)}${L('сегодня','today')} ${sign(C.today)}</span>`:'';
   $('#hud').innerHTML=`<div class="lv" data-tab="profile">${avaHTML(S.profile.ava,S.profile.nick||'V',34)}${badge(C.elo,40)}<div><div class="elo mono">${C.elo}</div><small>${toNext}</small></div></div>${live}<div class="coins" data-tab="shop"><b>◈</b><span class="mono">${num(C.balance)}</span></div><button class="ib langb" data-lang>${EN()?'RU':'EN'}</button><button class="ib snd" data-snd>${ic(UI.sound?'ui_sound_on':'ui_sound_off',24)||(UI.sound?'🔊':'🔇')}</button>`;
-  const v={week:vWeek,routine:vRoutine,disc:vDisc,quests:vQuests,shop:vShop,burm:vBurm,profile:vProfile,settings:vSettings,top:vTop,home:vHome}[UI.tab]||vHome;
-  $('#app').innerHTML=v(C);
+  const v={week:vWeek,routine:vRoutine,disc:vDisc,quests:vQuests,shop:vShop,burm:vBurm,profile:vProfile,settings:vSettings,top:vTop,home:vHome,admin:vAdmin}[UI.tab]||vHome;
+  $('#app').innerHTML=annBanner()+v(C);
   renderFocus();coinify($('#app'));coinify($('#hud'));coinify($('#focus'));schedulePush(C);postBurm();mountLogin();
 }
 function matchPill(m,d){
@@ -784,12 +840,16 @@ function vWeek(C){
 
 /* ---- дисциплина ---- */
 const MTPL=()=>[
-  {title:L('Подъём','Wake up'),emo:'⏰',kind:'time',dir:'le',target:'06:00',unit:'',coins:15,elo:4},
-  {title:L('Отбой','Bedtime'),emo:'🌙',kind:'time',dir:'le',target:'23:30',unit:'',coins:15,elo:4},
-  {title:L('Калории','Calories'),emo:'🍽',kind:'num',dir:'le',target:1500,unit:L('ккал','kcal'),coins:15,elo:4},
-  {title:L('Шаги','Steps'),emo:'👟',kind:'num',dir:'ge',target:10000,unit:L('шагов','steps'),coins:15,elo:4},
-  {title:L('Вода','Water'),emo:'💧',kind:'num',dir:'ge',target:2,unit:L('л','L'),coins:10,elo:3},
-  {title:L('Экранное время','Screen time'),emo:'📱',kind:'num',dir:'le',target:3,unit:L('ч','h'),coins:10,elo:3},
+  {key:'wake',title:L('Подъём','Wake up'),alt:['подъём','подъем','wake up'],emo:'⏰',kind:'time',dir:'le',target:'06:00',unit:''},
+  {key:'bed',title:L('Отбой','Bedtime'),alt:['отбой','bedtime'],emo:'🌙',kind:'time',dir:'le',target:'23:30',unit:''},
+  {key:'sleep',title:L('Сон','Sleep'),alt:['сон','sleep'],emo:'😴',kind:'num',dir:'ge',target:8,unit:L('ч','h')},
+  {key:'steps',title:L('Шаги','Steps'),alt:['шаги','steps'],emo:'👟',kind:'num',dir:'ge',target:10000,unit:L('шагов','steps')},
+  {key:'kcal',title:L('Калории','Calories'),alt:['калории','calories'],emo:'🍽',kind:'num',dir:'le',target:2000,unit:L('ккал','kcal')},
+  {key:'water',title:L('Вода','Water'),alt:['вода','water'],emo:'💧',kind:'num',dir:'ge',target:2,unit:L('л','L')},
+  {key:'screen',title:L('Экранное время','Screen time'),alt:['экранное время','screen time'],emo:'📱',kind:'num',dir:'le',target:3,unit:L('ч','h')},
+  {key:'train',title:L('Тренировка','Workout'),alt:['тренировка','workout'],emo:'🏋️',kind:'num',dir:'ge',target:30,unit:L('мин','min')},
+  {key:'readp',title:L('Чтение','Reading'),alt:['чтение','reading'],emo:'📚',kind:'num',dir:'ge',target:20,unit:L('стр.','pages')},
+  {key:'medit',title:L('Медитация','Meditation'),alt:['медитация','meditation'],emo:'🧘',kind:'num',dir:'ge',target:10,unit:L('мин','min')},
 ];
 const ATPL=()=>[L('Не депать в казик','No casino deposits'),L('Не фапать','No fap'),L('Без сладкого','No sweets'),L('Без алкоголя','No alcohol'),L('Без сигарет / вейпа','No smoking / vape'),L('Без doomscroll','No doomscrolling')];
 const MILES=[1,3,7,14,30,60,100,180,365];
@@ -800,11 +860,11 @@ function vDisc(C){
     return`<div class="mcard ${hit?'hit':''}" style="--c:${col}"><div class="row"><span class="mi">${esc(m.emo||'🎯')}</span><div style="flex:1"><div class="mt2">${esc(m.title)}</div><div class="tg">${m.dir==='le'?(m.kind==='time'?L('не позже','by'):L('не больше','max')):(m.kind==='time'?L('не раньше','not before'):L('не меньше','min'))} <b class="mono" style="color:var(--text)">${esc(m.target)}</b> ${esc(m.unit||'')}</div></div>${has?`<span class="pill ${hit?'w':'l'}">${hit?'✓':'✗'}</span>`:''}</div>
       <input type="${m.kind==='time'?'time':'text'}" ${m.kind==='num'?'inputmode="decimal"':''} value="${esc(v)}" placeholder="${m.kind==='time'?'--:--':L('впиши','enter')}" data-chg="mval" data-id="${m.id}">
       <div class="wk7">${days.map(x=>`<span class="${(m.log||{})[x]!==undefined&&(m.log||{})[x]!==''?(mHit(m,x)?'h':'m'):''}" title="${fmtD(x)}"></span>`).join('')}</div>
-      <div class="row" style="font-size:12px;color:var(--muted)"><span>${streak} 🔥</span><span>◈ ${m.coins} · +${m.elo||0} ELO</span><span class="sp"></span><button class="ib" data-act="medit" data-id="${m.id}">${L('изм.','edit')}</button><button class="ib" data-act="mdel" data-id="${m.id}">✕</button></div></div>`};
+      <div class="row" style="font-size:12px;color:var(--muted)"><span>${streak} 🔥</span><span>◈ ${MREW.coins} · +${MREW.elo} ELO</span><span class="sp"></span><button class="ib" data-act="medit" data-id="${m.id}">${L('изм.','edit')}</button><button class="ib" data-act="mdel" data-id="${m.id}">✕</button></div></div>`};
   const acard=a=>{const n=antiStreak(a),broke=(a.relapses||[]).includes(t),next=MILES.find(x=>x>n)||n+1,prev=[...MILES].reverse().find(x=>x<=n)||0,pr=(n-prev)/Math.max(1,next-prev),R0=42,Cc=2*Math.PI*R0;
     return`<div class="acard ${broke?'broke':''}" style="--c:${a.color||'#ff5c5c'}"><div class="ring"><svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="${R0}" fill="none" stroke="var(--line)" stroke-width="7"/><circle cx="48" cy="48" r="${R0}" fill="none" style="stroke:var(--c)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(Cc*pr).toFixed(1)} ${Cc.toFixed(1)}" transform="rotate(-90 48 48)"/></svg><div><b>${n}</b><small>${L('дн.','days')}</small></div></div>
       <div style="flex:1;min-width:0"><div class="mt2" style="font-weight:800;font-size:16px">${esc(a.title)}</div><div style="font-size:12px;color:var(--muted);margin:4px 0 8px">${broke?L('Сорвался сегодня — завтра новый отсчёт','Slipped today — fresh start tomorrow'):L(`до цели ${next} дн.: ещё ${next-n}`,`${next-n} more to ${next} days`)} · ${L('рекорд','best')} ${antiBest(a)}</div>
-        <div class="row" style="font-size:12px;color:var(--muted)"><span>${L('каждый чистый день','each clean day')}: ◈ ${a.coinsPer} · +${a.eloPer} ELO</span></div>
+        <div class="row" style="font-size:12px;color:var(--muted)"><span>${L('каждый чистый день','each clean day')}: ◈ ${AREW.coins} · +${AREW.elo} ELO</span></div>
         <div class="row" style="margin-top:10px">${broke?`<button class="btn" data-act="aundo" data-id="${a.id}">↶ ${L('Отменить срыв','Undo slip')}</button>`:`<button class="btn" data-act="arelapse" data-id="${a.id}" style="color:var(--loss)">${L('Сорвался','I slipped')}</button>`}<span class="sp"></span><button class="ib" data-act="aedit" data-id="${a.id}">${L('изм.','edit')}</button><button class="ib" data-act="adel" data-id="${a.id}">✕</button></div></div></div>`};
   const mt=MTPL().filter(x=>!S.metrics.some(m=>m.title===x.title)),at=ATPL().filter(x=>!S.anti.some(a=>a.title===x));
   const hits=S.metrics.filter(m=>mHit(m,t)).length;
@@ -818,24 +878,23 @@ function vDisc(C){
   <p class="sub" style="font-size:12px;margin-top:14px">${L(`Чистые дни засчитываются, когда день закончился. Срыв: −${S.settings.relapsePen||10} ELO и счётчик с нуля. Показатели входят в матч дня наравне с делами.`,`Clean days count once the day is over. A slip: −${S.settings.relapsePen||10} ELO and the counter resets. Metrics count toward the daily match like tasks.`)}</p>`;
 }
 function metricModal(m,tpl){
-  const isNew=!m;m=m||{title:'',emo:'🎯',kind:'num',dir:'ge',target:'',unit:'',coins:15,elo:4,...(tpl||{})};
+  const isNew=!m;m=m||{title:'',emo:'🎯',kind:'num',dir:'ge',target:'',unit:'',...(tpl||{})};const key=m.key,lim=MKEYS[key]&&MKEYS[key].lim;
   openModal(isNew?L('Новый показатель','New metric'):L('Изменить показатель','Edit metric'),[
     {k:'title',label:L('Название','Name'),value:m.title,req:true},{k:'emo',label:L('Эмодзи','Emoji'),value:m.emo},
     {k:'kind',label:L('Тип','Type'),type:'select',value:m.kind,options:[['time',L('Время (чч:мм)','Time (hh:mm)')],['num',L('Число','Number')]]},
     {k:'dir',label:L('Условие','Condition'),type:'select',value:m.dir,options:[['le',L('не позже / не больше','by / at most')],['ge',L('не раньше / не меньше','not before / at least')]]},
     {k:'target',label:L('Цель','Target'),value:m.target,req:true,hint:L('Для времени: 06:00. Для числа: 10000','Time: 06:00. Number: 10000')},
     {k:'unit',label:L('Единица','Unit'),value:m.unit},
-    {k:'coins',label:L('Монеты за выполнение','Coins per hit'),type:'number',value:m.coins},{k:'elo',label:L('ELO за выполнение','ELO per hit'),type:'number',value:m.elo},
-  ],o=>{if(o.kind==='time'&&!/^\d{1,2}:\d{2}$/.test(o.target)){toast(L('Время в формате 06:00','Time like 06:00'));return false}if(o.kind==='time')o.target=o.target.padStart(5,'0');else o.target=+String(o.target).replace(',','.')||0;
+  ].filter(f=>!(key&&(f.k==='kind'||f.k==='dir'))).map(f=>f.k==='target'&&lim?{...f,hint:lim[0]==='bed'?L('Между 21:00 и 01:00','Between 21:00 and 01:00'):lim[0]==='ge'?L(`Минимум ${lim[1]}`,`At least ${lim[1]}`):L(`Максимум ${lim[1]}`,`At most ${lim[1]}`)}:f),o=>{if(key){o.kind=m.kind;o.dir=m.dir}if(o.kind==='time'&&!/^\d{1,2}:\d{2}$/.test(o.target)){toast(L('Время в формате 06:00','Time like 06:00'));return false}if(o.kind==='time')o.target=o.target.padStart(5,'0');else o.target=+String(o.target).replace(',','.')||0;
+    const before=JSON.stringify(o.target);o.key=key;mFix(o);if(JSON.stringify(o.target)!==before)toast(L(`Цель поправил до ${o.target} — так честнее`,`Target adjusted to ${o.target}`));delete o.alt;
     if(isNew)S.metrics.push({id:uid(),created:today(),log:{},...o});else Object.assign(m,o)});
 }
 function antiModal(a,title){
-  const isNew=!a;a=a||{title:title||'',eloPer:4,coinsPer:10,created:today(),color:'#ff5c5c'};
+  const isNew=!a;a=a||{title:title||'',eloPer:AREW.elo,coinsPer:AREW.coins,created:today(),color:'#ff5c5c'};const was=a.created;
   openModal(isNew?L('Анти-привычка','Abstain from'):L('Изменить','Edit'),[
     {k:'title',label:L('Что не делаю','What I don\'t do'),value:a.title,req:true},
-    {k:'coinsPer',label:L('Монеты за чистый день','Coins per clean day'),type:'number',value:a.coinsPer},{k:'eloPer',label:L('ELO за чистый день','ELO per clean day'),type:'number',value:a.eloPer},
-    {k:'created',label:L('Держусь с','Clean since'),type:'date',value:a.created,req:true},{k:'color',label:L('Цвет','Color'),type:'color',value:a.color||'#ff5c5c'},
-  ],o=>{if(o.created>today())o.created=today();if(isNew)S.anti.push({id:uid(),relapses:[],...o});else Object.assign(a,o)});
+    ...(isNew?[]:[{k:'created',label:L('Держусь с','Clean since'),type:'date',value:a.created,req:true,hint:L('Раньше даты создания поставить нельзя','Can\'t be earlier than when you added it')}]),{k:'color',label:L('Цвет','Color'),type:'color',value:a.color||'#ff5c5c'},
+  ],o=>{o.coinsPer=AREW.coins;o.eloPer=AREW.elo;if(isNew)o.created=today();else{if(!o.created||o.created<was)o.created=was;if(o.created>today())o.created=today()}if(isNew)S.anti.push({id:uid(),relapses:[],...o});else Object.assign(a,o)});
 }
 
 /* ---- рутина ---- */
@@ -904,7 +963,7 @@ function vShop(C){
 const MULTS=[1.2,1.5,2,3,5,10,20];
 const ANIMS=()=>({random:L('🎲 Рандом','🎲 Random'),classic:L('Классика','Classic'),rebound:L('Отскок','Rebound'),tease:L('Нервы','Tease'),double:L('Двойная','Double'),flick:L('Резкая','Flick')});
 function upgCalc(C){
-  const u=UI.u,stake=Math.max(0,Math.floor(+u.stake||0)),floor=Math.round(C.earned*.1),max=Math.max(0,Math.floor((C.balance-floor)/2));
+  const u=UI.u,stake=Math.max(0,Math.floor(+u.stake||0)),{floor,max}=gLimit(C);
   let ch=0,payout=0,prize='',r=null,ok=stake>0&&stake<=max,why='';
   if(stake>max)why=max<1?L('Свободных монет нет — иди делать дела','No free coins — go do some tasks'):L(`Максимум ставки сейчас ◈ ${max}`,`Max stake right now ◈ ${max}`);
   if(u.mode==='x'){ch=1/Math.max(1.01,u.mult);payout=Math.round(stake*u.mult);prize=`◈ ${num(payout)}`}
@@ -1120,18 +1179,18 @@ function openCase(cid){
 
 /* ============ БУРМАЛДА ============ */
 const BTABS=()=>[['upgrade',(ic('game_upgrade',24)||'⇪ ')+L('Апгрейд','Upgrade')],['cases',(ic('case_starter',24)||'📦 ')+L('Кейсы','Cases')],['crash',(ic('game_crash',24)||'📈 ')+L('Краш','Crash')],['roul',(ic('game_roulette',24)||'🎡 ')+L('Рулетка','Roulette')],['bj',(ic('game_blackjack',24)||'🃏 ')+L('Блэкджек','Blackjack')]];
-function gLimit(C){const floor=Math.round(C.earned*.1);return{floor,max:Math.max(0,Math.floor((C.balance-floor)/2))}}
+function gLimit(C){const fl=CFG.floor!=null&&CFG.floor!==''?+CFG.floor:.1,sh=CFG.stakeShare!=null&&CFG.stakeShare!==''?+CFG.stakeShare:.5;const floor=Math.round(C.earned*fl);return{floor,max:Math.max(0,Math.floor((C.balance-floor)*sh))}}
 function gStake(C,key){const l=gLimit(C),stake=Math.max(0,Math.floor(+UI.gs[key]||0));return{...l,stake,ok:stake>0&&stake<=l.max}}
 function stakeUI(C,key,dis){const k=gStake(C,key);return`<h3>${L('Ставка','Stake')}</h3><div class="stake" style="margin-bottom:8px"><input type="number" min="1" value="${k.stake}" data-gstake="${key}" ${dis?'disabled':''}>${[['0.1','10%'],['0.25','25%'],['max','MAX']].map(([v,l])=>`<button class="btn" data-act="gst" data-id="${key}" data-d="${v}" ${dis?'disabled':''}>${l}</button>`).join('')}</div>
   <div style="font-size:12px;color:var(--muted)" id="gsinfo-${key}">${k.stake>k.max?`<span style="color:var(--gold)">${k.max<1?L('Свободных монет нет','No free coins'):L(`Максимум ◈ ${k.max}`,`Max ◈ ${k.max}`)}</span>`:`${L('Можно до','Up to')} ◈ ${num(k.max)} · ${L('запас','reserve')} ◈ ${num(k.floor)}`}</div>`}
 function gRec(g,stake,extra){const r={id:uid(),date:today(),g,stake,payout:0,...(extra||{})};S.games.push(r);save();return r}
 const MODES=()=>[
   {k:'upgrade',t:L('Апгрейд','Upgrade'),img:'game_upgrade',c:'#e0408f',w:'',sub:()=>{const u=S.upg[S.upg.length-1];return u?(u.win?L('прошлый — зашёл 🔥','last one hit 🔥'):L('прошлый — мимо','last one missed')):L('шанс от 1% до 95%','1% to 95% chance')}},
-  {k:'cases',t:L('Кейсы','Cases'),img:'case_pro',c:'#d9902a',w:'',sub:()=>L(`4 кейса · от ◈ 100`,`4 cases · from ◈ 100`)},
+  {k:'cases',t:L('Кейсы','Cases'),img:'case_pro',c:'#d9902a',w:'',sub:()=>{const mn=Math.min(...CASES.map(c=>+c.cost||0));return L(`${CASES.length} кейса · от ◈ ${mn}`,`${CASES.length} cases · from ◈ ${mn}`)}},
   {k:'crash',t:L('Краш','Crash'),img:'game_crash',c:'#22c55e',w:'',sub:()=>UI.cr.hist[0]?L(`прошлый взрыв x${UI.cr.hist[0].toFixed(2)}`,`last crash x${UI.cr.hist[0].toFixed(2)}`):L('забери до взрыва','cash out before it blows'),tag:['live','LIVE']},
   {k:'roul',t:L('Рулетка','Roulette'),img:'game_roulette',c:'#e5484d',w:'w3',sub:()=>UI.ro.last?L(`выпало ${UI.ro.last.n}`,`last: ${UI.ro.last.n}`):'x2 · x2 · x14'},
   {k:'bj',t:L('Блэкджек','Blackjack'),img:'game_blackjack',c:'#3b82f6',w:'w3',sub:()=>L('блэкджек платит 3:2','blackjack pays 3:2'),tag:['hot','21']},
-];
+].filter(m=>gameOn(m.k));
 const tile=(m,act,d,extra='')=>`<div class="mt ${m.w||''}" style="--c:${m.c}" data-act="${act}" data-d="${d}">${m.tag?`<span class="tag ${m.tag[0]}">${m.tag[1]}</span>`:''}${IMG[m.img]?`<img class="art" src="${IMG[m.img]}" alt="">`:''}<div class="tt"><b>${m.t}</b>${m.sub?`<small class="${m.mut?'mut':''}">${m.sub()}</small>`:''}</div>${extra}</div>`;
 function vBurm(C){
   const l=gLimit(C),bt=UI.bt,net=Math.round(C.upgNet+C.caseNet+C.gameNet);
@@ -1176,17 +1235,28 @@ function vHome(C){
 function postBurm(){if(UI.tab!=='burm')return;if(UI.bt==='crash')drawCrash();if(UI.bt==='roul'&&!UI.ro.spinning)posRoul()}
 
 /* ---- скрытая удача: продуктивность + фазы + серии ---- */
-function luck(C){
+const PHN=()=>({cold:L('🥶 Холодная','🥶 Cold'),warm:L('🌤 Тёплая','🌤 Warm'),hot:L('🔥 Горячая','🔥 Hot')});
+function phaseOf(pid,at){const win=(+CFG.luckWindow||40)*60000;let salt=0;for(const ch of String(pid||'v'))salt=(salt*31+ch.charCodeAt(0))%9973;
+  const wnd=Math.floor((at||Date.now())/win),rr=Math.abs(Math.sin((wnd+salt)*12.9898)*43758.5453)%1;
+  return{ph:rr<.3?'cold':rr<.75?'warm':'hot',left:Math.ceil(((wnd+1)*win-(at||Date.now()))/60000)}}
+function streakOf(h){h=h||[];let ls=0,ws=0;for(let i=h.length-1;i>=0;i--){if(h[i]==='w'){if(ls)break;ws++}else{if(ws)break;ls++}}return{ls,ws,v:Math.min(ls,5)*.06-Math.min(ws,4)*.08}}
+function luckInfo(C){
   C=C||compute();let p=0;const lv=C.live;
   if(lv)p+=lv.win?.12:lv.ratio<.3?-.12:-.04;
   const y=C.matches[add(today(),-1)];if(y&&!y.live)p+=y.win?.04:-.05;
-  let salt=0;for(const ch of String(S.profile.id||'v'))salt=(salt*31+ch.charCodeAt(0))%9973;
-  const wnd=Math.floor(Date.now()/(40*60000)),rr=Math.abs(Math.sin((wnd+salt)*12.9898)*43758.5453)%1;
-  const ph=rr<.3?-.15:rr<.75?0:.15;
-  const h=S.luckHist||[];let ls=0,ws=0;for(let i=h.length-1;i>=0;i--){if(h[i]==='w'){if(ls)break;ws++}else{if(ws)break;ls++}}
-  const st=Math.min(ls,5)*.06-Math.min(ws,4)*.08;
-  return Math.max(.65,Math.min(1.45,1+p+ph+st));
+  const amp=CFG.phaseAmp!=null&&CFG.phaseAmp!==''?+CFG.phaseAmp:.15;
+  const P0=phaseOf(S.profile.id),forced=(ADM.luck||{}).phase,phase=['cold','warm','hot'].includes(forced)?forced:P0.ph;
+  const ph=phase==='cold'?-amp:phase==='hot'?amp:0;
+  const sk=streakOf(S.luckHist);
+  const adm=+((ADM.luck||{}).add)||0,glob=+CFG.luckAdd||0,tuned=adm!==0||glob!==0;
+  const total=Math.max(tuned?.2:.65,Math.min(tuned?2.5:1.45,1+p+ph+sk.v+adm+glob));
+  return{day:p,phase,forced:!!forced&&phase===forced,ph,left:P0.left,streak:sk.v,ls:sk.ls,ws:sk.ws,adm,glob,total}
 }
+function luck(C){return luckInfo(C).total}
+/* реальные шансы при данном множителе удачи */
+function chancesAt(f){const up=m=>{const ch=Math.min(.95,1/m);let k=.8*f;if(ch<=.1)k*=.92;return Math.min(.9,Math.max(.01,ch*k))};
+  const cs=CASES[0];let rare=0;if(cs){const W=it=>it.w*('rel'.includes(it.r)?f*f:1),tot=cs.items.reduce((a,i)=>a+W(i),0);rare=cs.items.filter(i=>'rel'.includes(i.r)).reduce((a,i)=>a+W(i),0)/tot}
+  return{x2:up(2),x5:up(5),x10:up(10),red:Math.min(.9,7/15*f*.97),green:Math.min(.9,1/15*f*.97),crash2:Math.min(1,.96/(1+1/f)),rare}}
 const luckPush=w=>{S.luckHist=(S.luckHist||[]).concat(w?'w':'l').slice(-30)};
 
 /* ---- краш ---- */
@@ -1478,12 +1548,12 @@ async function loadTop(force){
 }
 /* облачное сохранение: прогресс живёт на сервере, можно заходить с телефона и ПК */
 function cloudSched(){clearTimeout(CLOUD.t);CLOUD.t=setTimeout(cloudSave,4000)}
-function adoptCloud(st,at){const uid=S.net.uid;S=normalize(st);S.net.uid=uid;S.savedAt=+at||0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}lastLvl=null;lastBonus=null}
+function adoptCloud(st,at,rev){if(rev!=null)setRev(rev);const uid=S.net.uid;if(st&&st.__reset){st=seed(S.settings.lang||'ru');toast(L('♻️ Прогресс сброшен администратором','♻️ Progress was reset by the admin'))}S=normalize(st);S.net.uid=uid;S.savedAt=+at||0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}lastLvl=null;lastBonus=null}
 async function cloudSave(){
   if(!ONL()||!CLOUD.ready)return;if(CLOUD.busy){cloudSched();return}
   CLOUD.busy=true;clearTimeout(CLOUD.t);CLOUD.t=null;
-  try{if(!S.savedAt)S.savedAt=Date.now();const j=await api('save',{state:S,savedAt:S.savedAt});
-    if(j.conflict&&j.state){adoptCloud(j.state,j.saved_at);render();toast(L('☁️ Подтянул свежие данные с другого устройства','☁️ Pulled newer data from another device'))}
+  try{if(!S.savedAt)S.savedAt=Date.now();const j=await api('save',{state:S,savedAt:S.savedAt,...(CLOUD.rev!=null?{rev:CLOUD.rev}:{})});
+    if(j.conflict&&j.state){adoptCloud(j.state,j.saved_at,j.rev);render();toast(L('☁️ Подтянул свежие данные с другого устройства','☁️ Pulled newer data from another device'))}
     UI.netErr=''}
   catch(e){UI.netErr=String(e.message||e)}
   CLOUD.busy=false;
@@ -1495,7 +1565,9 @@ async function cloudBoot(){
   S.net.uid=String(u.id);
   try{
     const j=await api('load');
-    if(j.state&&(+j.saved_at||0)>(+S.savedAt||0)){adoptCloud(j.state,j.saved_at);toast(L('☁️ Прогресс загружен из облака','☁️ Progress loaded from the cloud'))}
+    CFG=j.cfg&&typeof j.cfg==='object'?j.cfg:{};saveCFG();applyCFG();let kr=null;try{kr=localStorage.getItem('vozduh_rev')}catch(e){}const revChanged=kr!=null&&+kr!==(+j.rev||0);setRev(j.rev);
+    ADM={admin:!!j.is_admin,banned:!!j.banned,ann:typeof j.ann==='string'?j.ann:'',adj:Array.isArray(j.adj)?j.adj:[],luck:j.luck||{add:0,phase:null}};saveADM();
+    if(j.state&&((+j.saved_at||0)>(+S.savedAt||0)||revChanged)){adoptCloud(j.state,j.saved_at,j.rev);toast(L('☁️ Прогресс загружен из облака','☁️ Progress loaded from the cloud'))}
     if(!S.profile.nick.trim())S.profile.nick=String(u.first_name||u.username||'Player').slice(0,20);
     const sp=TG?(TG.initDataUnsafe.start_param||''):'';
     if(/^f\d+$/.test(sp)){const fid=sp.slice(1);if(fid!==S.net.uid&&!S.friends.includes(fid)){S.friends.push(fid);toast(L('🤝 Друг добавлен','🤝 Friend added'))}}
@@ -1506,7 +1578,14 @@ async function cloudBoot(){
 }
 /* вход на сайте через Telegram — тот же аккаунт и прогресс, что в боте */
 window.onTgAuth=function(user){if(!user||!user.hash)return;LOGIN=user;try{localStorage.setItem('vozduh_tglogin',JSON.stringify(user))}catch(e){}CLOUD.ready=false;UI.lb={view:'all'};toast(L('✅ Вошёл через Telegram','✅ Logged in with Telegram'));cloudBoot()};
-function tgLogout(silent){if(CLOUD.t){clearTimeout(CLOUD.t);CLOUD.t=null}LOGIN=null;CLOUD.ready=false;try{localStorage.removeItem('vozduh_tglogin')}catch(e){}UI.lb={view:'all'};if(!silent)render()}
+async function cloudPing(){if(!ONL()||!CLOUD.ready||CLOUD.busy||UI.busy||UI.u.spinning||UI.gbusy)return;
+  try{const j=await api('ping');const was=JSON.stringify([ADM,CFG]);CFG=j.cfg||{};saveCFG();applyCFG();
+    ADM={admin:!!j.is_admin,banned:!!j.banned,ann:typeof j.ann==='string'?j.ann:'',adj:Array.isArray(j.adj)?j.adj:[],luck:j.luck||{add:0,phase:null}};saveADM();
+    if((+j.rev||0)!==CLOUD.rev){const l=await api('load');if(l.state){adoptCloud(l.state,l.saved_at,l.rev);toast(L('🔄 Данные обновлены','🔄 Data updated'))}else setRev(l.rev)}
+    else if(was===JSON.stringify([ADM,CFG]))return;
+    if($('#modal').classList.contains('hidden'))render()}catch(e){}}
+setInterval(cloudPing,90000);
+function tgLogout(silent){try{localStorage.removeItem('vozduh_rev')}catch(e){}ADM={admin:false,banned:false,ann:'',adj:[]};saveADM();if(CLOUD.t){clearTimeout(CLOUD.t);CLOUD.t=null}LOGIN=null;CLOUD.ready=false;try{localStorage.removeItem('vozduh_tglogin')}catch(e){}UI.lb={view:'all'};if(!silent)render()}
 function loginBox(){if(TG||LOGIN)return'';return`<div class="card" style="margin-bottom:14px;border-color:var(--gold)"><h3>🔐 ${L('Синхронизация с ботом','Sync with the bot')}</h3><p style="font-size:13px;color:var(--muted);margin:0 0 10px">${L('Войди через Telegram — подтянется тот же прогресс, что в боте @','Log in with Telegram to get the same progress as in the bot @')}${ONLINE.bot}${L(', и откроется онлайн-топ.',', plus the online board.')}</p><div class="tglogin"></div></div>`}
 function mountLogin(){if(TG||LOGIN)return;document.querySelectorAll('.tglogin').forEach(el=>{if(el.dataset.m)return;el.dataset.m=1;const sc=document.createElement('script');sc.async=true;sc.src='https://telegram.org/js/telegram-widget.js?22';sc.setAttribute('data-telegram-login',ONLINE.bot);sc.setAttribute('data-size','large');sc.setAttribute('data-radius','10');sc.setAttribute('data-onauth','onTgAuth(user)');el.appendChild(sc)})}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&CLOUD.t)cloudSave()});
@@ -1523,7 +1602,7 @@ const RULES=`{
   }
 }`;
 function vTop(C){
-  if(!netOK())return loginBox()+vTopOffline(C);
+  if(!netOK())return`<h2>${L('Топ игроков','Leaderboard')}</h2><p class="sub">${seasonName(C.sn)}</p>`+loginBox();
   if(false){
     return`<h2>${L('Топ игроков и друзья','Leaderboard & friends')}</h2><p class="sub">${L('Для общего топа нужна бесплатная база Firebase — настраивается один раз, минуты за 3.','A shared leaderboard needs a free Firebase database — one-time setup, about 3 minutes.')}</p>
     <div class="grid2"><div class="card"><h3>${L('Как подключить','How to connect')}</h3><ol class="steps">
@@ -1641,7 +1720,7 @@ function vProfile(C){
   const past=Object.values(C.seasons).filter(x=>x.n!==C.sn&&x.matches>0).sort((a,b)=>b.n-a.n);
   return`<div class="card" style="margin-bottom:16px"><div class="prof"><div class="avaedit" data-act="ava" title="${L('Сменить аватарку','Change avatar')}">${avaHTML(S.profile.ava,S.profile.nick||'V',84)}</div>
     <div style="flex:1;min-width:240px"><div class="fld"><label>${L('Ник','Nickname')}</label><input type="text" maxlength="20" value="${esc(S.profile.nick)}" placeholder="${L('Придумай ник','Pick a nickname')}" data-chg="nick" style="max-width:280px;font-size:16px;font-weight:700"></div>
-    ${S.net.uid?`<div style="font-size:12px;color:var(--muted);margin-top:8px">${L('Код друга','Friend code')}: <span class="code">${esc(S.net.uid)}</span> <button class="ib" data-act="copycode">${L('копировать','copy')}</button></div>`:`<div style="font-size:12px;color:var(--dim);margin-top:8px">${L('Карточка для друзей — во вкладке «Топ»','Your card for friends is in the Top tab')}</div>`}</div>
+    ${S.net.uid?`<div style="font-size:12px;color:var(--muted);margin-top:8px">${L('Код друга','Friend code')}: <span class="code">${esc(S.net.uid)}</span> <button class="ib" data-act="copycode">${L('копировать','copy')}</button></div>`:`<div style="font-size:12px;color:var(--dim);margin-top:8px">${L('Войди через Telegram во вкладке «Топ», чтобы играть онлайн','Log in with Telegram in the Top tab to play online')}</div>`}</div>
     <div class="card" style="min-width:240px;background:var(--panel2)"><div class="seasonbar">${ic('season',22)}<b>${seasonName(C.sn)}</b><span class="sp"></span><span style="color:var(--muted);font-size:12px">${sr.start?L(`до конца ${left} дн.`,`${left} days left`):''}</span></div>${sr.start?`<div class="bar" style="margin-top:8px"><i style="width:${Math.min(100,(total-left)/total*100)}%"></i></div><div style="font-size:11px;color:var(--dim);margin-top:6px">${fmtD(sr.start)} — ${fmtD(sr.end)} · ${L('в конце ELO обнуляется до','ELO resets to')} ${S.settings.eloStart}</div>`:''}</div>
   </div></div>
   <div class="card" style="margin-bottom:16px"><div class="prof">${emblem(C.elo,120)}<div style="flex:1;min-width:240px">
@@ -1672,10 +1751,176 @@ function vProfile(C){
   <h3 style="margin-top:24px">${L('Ачивки','Achievements')} · ${Object.keys(S.ach).length}/${ACH.length}</h3>
   <div class="ach">${ACH.map(([id,ico,name,desc])=>`<div class="a ${S.ach[id]?'on':''}"><div class="ico">${ic('ach_'+id,40)||ico}</div><div><b>${esc(nm(name))}</b><small>${esc(nm(desc))}${S.ach[id]?` · ${fmtD(S.ach[id])}`:''}</small></div></div>`).join('')}</div>
   <div class="card" style="margin-top:24px;font-size:13px;color:var(--muted)"><h3>${L('Как считается ELO','How ELO works')}</h3>
-  ${L(`<b>За каждое дело</b> сразу: обычное +${S.settings.eloTask}, рутина/привычка +${S.settings.eloRoutine}, шаг квеста +${S.settings.eloStep}, побочка +${S.settings.sideElo}, сюжетный квест +${S.settings.mainElo}.<br><b>Матч дня</b>: ≥ ${S.settings.win}% плана — победа <b style="color:var(--win)">+15…+30</b>, меньше — <b style="color:var(--loss)">−15…−30</b>. Идеальный день (100%) — ещё +${S.settings.perfectBonus}.<br><b>🔥 Серия</b>: каждая победа подряд даёт +10% ко всему заработку дня, максимум ×2. Слил день — множитель сброшен. Сейчас ×${(C.mult||1).toFixed(1)}.<br>Сезон длится ${SEASON_MONTHS} мес., потом ELO обнуляется до ${S.settings.eloStart}.`,
-  `<b>Every task</b> pays instantly: task +${S.settings.eloTask}, routine/habit +${S.settings.eloRoutine}, quest step +${S.settings.eloStep}, side quest +${S.settings.sideElo}, main quest +${S.settings.mainElo}.<br><b>Daily match</b>: ≥ ${S.settings.win}% of plan — win <b style="color:var(--win)">+15…+30</b>, less — <b style="color:var(--loss)">−15…−30</b>. Perfect day (100%) — another +${S.settings.perfectBonus}.<br><b>🔥 Streak</b>: each win in a row adds +10% to the whole day's gain, up to ×2. Lose a day — reset. Now ×${(C.mult||1).toFixed(1)}.<br>A season lasts ${SEASON_MONTHS} months, then ELO resets to ${S.settings.eloStart}.`)}</div>`;
+  ${L(`<b>За каждое дело</b> сразу: обычное +${S.settings.eloTask}, рутина/привычка +${S.settings.eloRoutine}, шаг квеста +${S.settings.eloStep}, побочка +${S.settings.sideElo}, сюжетный квест +${S.settings.mainElo}.<br><b>Лимиты</b>: до ${CAPS.eloCat} ELO с категории и до ${CAPS.eloDay} ELO за дела в день, квесты — до ${CAPS.eloQuest}.<br><b>Матч дня</b>: ≥ ${S.settings.win}% плана — победа <b style="color:var(--win)">+15…+30</b>, меньше — <b style="color:var(--loss)">−15…−30</b>. Идеальный день (100%) — ещё +${S.settings.perfectBonus}.<br><b>🔥 Серия</b>: каждая победа подряд даёт +10% ко всему заработку дня, максимум ×2. Слил день — множитель сброшен. Сейчас ×${(C.mult||1).toFixed(1)}.<br>Сезон длится ${SEASON_MONTHS} мес., потом ELO обнуляется до ${S.settings.eloStart}.`,
+  `<b>Every task</b> pays instantly: task +${S.settings.eloTask}, routine/habit +${S.settings.eloRoutine}, quest step +${S.settings.eloStep}, side quest +${S.settings.sideElo}, main quest +${S.settings.mainElo}.<br><b>Caps</b>: up to ${CAPS.eloCat} ELO per category and ${CAPS.eloDay} ELO from tasks a day, quests up to ${CAPS.eloQuest}.<br><b>Daily match</b>: ≥ ${S.settings.win}% of plan — win <b style="color:var(--win)">+15…+30</b>, less — <b style="color:var(--loss)">−15…−30</b>. Perfect day (100%) — another +${S.settings.perfectBonus}.<br><b>🔥 Streak</b>: each win in a row adds +10% to the whole day's gain, up to ×2. Lose a day — reset. Now ×${(C.mult||1).toFixed(1)}.<br>A season lasts ${SEASON_MONTHS} months, then ELO resets to ${S.settings.eloStart}.`)}</div>`;
 }
 
+/* ---- объявление и админка ---- */
+function annBanner(){let h='';if(ONL()&&ADM.banned)h+=`<div class="card" style="border-color:var(--loss);color:var(--loss);margin-bottom:14px">⛔ ${L('Ты убран из онлайн-топа администратором.','You were removed from the online board by the admin.')}</div>`;
+  if(ONL()&&ADM.ann)h+=`<div class="card" style="border-color:var(--gold);margin-bottom:14px"><b style="color:var(--gold)">📢 ${L('Объявление','Announcement')}</b><div style="margin-top:6px;white-space:pre-wrap">${esc(ADM.ann)}</div></div>`;return h}
+UI.adm={list:null,sel:null,det:null,q:'',loading:false,err:''};
+async function admLoad(){UI.adm.loading=true;try{const j=await api('admin_list');UI.adm.list=j.players||[];UI.adm.ann=typeof j.ann==='string'?j.ann:'';UI.adm.err=''}catch(e){UI.adm.err=String(e.message||e)}UI.adm.loading=false;if(UI.tab==='admin')render()}
+async function admOpen(id){UI.adm.sel=id;UI.adm.det={loading:true};render();try{const j=await api('admin_get',{id});UI.adm.det=j;UI.adm.det.an=analyze(j.state,j.adj,j.player)}catch(e){UI.adm.det={err:String(e.message||e)}}if(UI.tab==='admin')render()}
+/* прогоняем чужой прогресс через тот же расчёт, что у игрока */
+function analyze(state,adj,plr){if(!state||state.__reset)return null;const me=S,meL=LASTC,meA=ADM;let out=null;
+  try{S=normalize(JSON.parse(JSON.stringify(state)));ADM={...meA,adj:(adj||[]).slice().reverse(),luck:{add:+(plr||{}).luck_add||0,phase:(plr||{}).luck_phase||null}};const C=compute(),t=today();const LI=luckInfo(C);
+    const rmap=Object.fromEntries(S.routines.map(r=>[r.id,r])),days=[];const prevE={};C.series.forEach((p,i)=>{if(i)prevE[p.d]=p.elo-C.series[i-1].elo});
+    for(let i=0,d=t;i<30&&d>=S.start;i++,d=add(d,-1)){const it=[];
+      S.tasks.filter(x=>x.done&&x.date===d).forEach(x=>it.push(['✓',x.title,x.cat]));
+      Object.keys(S.rlog[d]||{}).forEach(id=>rmap[id]&&it.push(['↻',rmap[id].title,rmap[id].cat]));
+      S.metrics.filter(m=>mHit(m,d)).forEach(m=>it.push(['📏',m.title+': '+m.log[d],'_metric']));
+      S.quests.forEach(q=>{q.steps.forEach(st=>{if(st.done&&st.doneAt===d)it.push(['▸',q.title+' → '+st.t,q.cat])});if(q.done&&(q.doneDate||t)===d)it.push(['📜',q.title,q.cat])});
+      S.sides.filter(q=>q.status==='done'&&(q.doneDate||t)===d).forEach(q=>it.push(['🗺',q.title||q.t||'side','']));
+      (S.anti||[]).filter(a=>(a.relapses||[]).includes(d)).forEach(a=>it.push(['💥',L('срыв: ','slip: ')+a.title,'_anti']));
+      const g=S.games.filter(x=>x.date===d).reduce((a,x)=>a+(+x.payout||0)-(+x.stake||0),0)+S.upg.filter(x=>x.date===d).reduce((a,u)=>a+(u.win&&u.mode==='x'?(+u.payout||0):0)+(+u.refund||0)-(+u.stake||0),0)+S.cases.filter(x=>x.date===d).reduce((a,c)=>a+(+c.coins||0)-(+c.cost||0),0);
+      const m=C.matches[d];days.push({d,elo:prevE[d]||0,coins:C.coinsByDay[d]||0,gamble:g,shop:S.buys.filter(x=>x.date===d).reduce((a,b)=>a+(+b.coins||0),0),it,match:m?{r:Math.round(m.ratio*100),win:m.win}:null})}
+    const gm=[...S.games.map(g=>(+g.payout||0)-(+g.stake||0)),...S.upg.map(u=>(u.win&&u.mode==='x'?(+u.payout||0):0)+(+u.refund||0)-(+u.stake||0)),...S.cases.map(c=>(+c.coins||0)-(+c.cost||0))];
+    out={li:LI,ch:chancesAt(LI.total),bets:gm.length,betW:gm.filter(x=>x>0).length,betL:gm.filter(x=>x<0).length,lh:(S.luckHist||[]).slice(-15).join(''),elo:C.elo,peak:C.peak,balance:C.balance,earned:C.earned,spent:C.spent,gamble:C.upgNet+C.caseNet+C.gameNet,adjCoins:C.adjCoins,streak:C.streak,wins:C.season.wins,losses:C.season.losses,start:S.start,nTasks:S.tasks.length,nRout:S.routines.length,nMet:S.metrics.length,days,cats:S.cats}}
+  catch(e){out={err:String(e.message||e)}}finally{S=me;LASTC=meL;ADM=meA}return out}
+function vAdmin(C){const A0=UI.adm;if(!A0.list&&!A0.loading){admLoad()}
+  const q=A0.q.trim().toLowerCase();const list=(A0.list||[]).filter(p=>!q||[p.nick,p.tg_username,p.tg_name,p.id].join(' ').toLowerCase().includes(q));
+  const ago=ts=>{if(!ts)return'—';const m=Math.round((Date.now()-new Date(ts))/60000);return m<60?m+L(' мин',' min'):m<1440?Math.round(m/60)+L(' ч',' h'):Math.round(m/1440)+L(' дн',' d')};
+  const rows=list.map(p=>`<tr class="${A0.sel===p.id?'me':''}" style="cursor:pointer" data-adm="open" data-id="${esc(p.id)}"><td><b>${esc(p.nick||'—')}</b>${p.banned?' <span class="pill l">BAN</span>':''}<div style="font-size:11px;color:var(--dim)">${p.tg_username?'@'+esc(p.tg_username):esc(p.tg_name||'')} · ${esc(p.id)}</div></td><td class="mono">${p.elo}</td><td class="mono" style="color:var(--muted)">${p.wins}/${p.losses}</td><td class="mono" style="color:${p.adj_elo||p.adj_coins?'var(--gold)':'var(--dim)'}">${p.adj_elo||p.adj_coins?sign(p.adj_elo)+' / ◈'+sign(p.adj_coins):'—'}</td><td style="font-size:12px;white-space:nowrap">${admPh(p)}</td><td style="color:var(--muted);font-size:12px">${ago(p.updated_at)}</td></tr>`).join('');
+  const view=A0.view||'players';
+  const head=`<div class="row"><div><h2>🛠 ${L('Админка','Admin')}</h2><p class="sub">${L('Полный контроль: игроки, правила, цены, игры. Видно только админам.','Full control: players, rules, prices, games. Admins only.')}</p></div><span class="sp"></span><div class="seg"><button class="${view==='players'?'on':''}" data-adm="view" data-d="players">👥 ${L('Игроки','Players')}</button><button class="${view==='game'?'on':''}" data-adm="view" data-d="game">⚙️ ${L('Настройки игры','Game settings')}</button><button class="${view==='admins'?'on':''}" data-adm="view" data-d="admins">🛡 ${L('Админы','Admins')}</button></div><button class="btn" data-adm="reload">↻</button></div>`;
+  if(view==='game')return head+admGame();
+  if(view==='admins')return head+admAdmins();
+  return head+`
+  ${A0.err?`<div class="card" style="border-color:var(--loss);color:var(--loss);margin-bottom:12px">${esc(A0.err)}</div>`:''}
+  <div class="card" style="margin-bottom:14px"><h3>📢 ${L('Объявление для всех','Announcement for everyone')}</h3><textarea id="admAnn" rows="2" style="width:100%" maxlength="500" placeholder="${L('Пусто — объявление скрыто','Empty — hidden')}">${esc(A0.ann||'')}</textarea><button class="btn pri" data-adm="ann" style="margin-top:8px">${L('Опубликовать','Publish')}</button></div>
+  <div class="grid2" style="align-items:start"><div class="card" style="overflow-x:auto"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">${L('Игроки','Players')} · ${(A0.list||[]).length}</h3><span class="sp"></span><input id="admQ" type="text" value="${esc(A0.q)}" placeholder="${L('поиск','search')}" style="max-width:160px"></div>
+    ${A0.loading&&!A0.list?`<div class="empty">${L('Загружаю…','Loading…')}</div>`:`<table class="lb"><thead><tr><th>${L('Игрок','Player')}</th><th>ELO</th><th>W/L</th><th>${L('Корр.','Adj.')}</th><th>${L('Удача','Luck')}</th><th>${L('Был','Seen')}</th></tr></thead><tbody>${rows}</tbody></table>`}</div>
+    <div>${admDetail()}</div></div>`}
+function admDetail(){const D=UI.adm.det;if(!UI.adm.sel)return`<div class="card"><div class="empty">${L('Выбери игрока слева','Pick a player')}</div></div>`;
+  if(!D||D.loading)return`<div class="card"><div class="empty">${L('Загружаю…','Loading…')}</div></div>`;if(D.err)return`<div class="card" style="color:var(--loss)">${esc(D.err)}</div>`;
+  const P=D.player||{},an=D.an,id=UI.adm.sel;const cn=(cats,c)=>{const x=(cats||[]).find(z=>z.id===c);return x?`<span style="color:${x.color}">${esc(x.name)}</span>`:''};
+  const stat=(k,v)=>`<div class="kv"><span>${k}</span><b class="mono">${v}</b></div>`;
+  return`<div class="card"><div class="row"><h3 style="margin:0">${esc(P.nick||'—')} ${P.tg_username?`<a href="https://t.me/${esc(P.tg_username)}" target="_blank" style="color:var(--gold);font-size:12px">@${esc(P.tg_username)}</a>`:''}</h3><span class="sp"></span>${P.banned?`<button class="btn" data-adm="ban" data-d="0" data-id="${esc(id)}">${L('Разбанить','Unban')}</button>`:`<button class="btn" data-adm="ban" data-d="1" data-id="${esc(id)}" style="color:var(--loss)">${L('Бан из топа','Ban from board')}</button>`}</div>
+    <div style="font-size:12px;color:var(--dim);margin:4px 0 10px">ID ${esc(id)} · ${esc(P.tg_name||'')}</div>
+    ${an&&!an.err?`${stat('ELO',`${an.elo} <span style="color:var(--dim)">(${L('в топе','board')} ${P.elo})</span>`)}${stat(L('Пик','Peak'),an.peak)}${stat(L('Баланс','Balance'),'◈ '+num(an.balance))}${stat(L('Заработано делами','Earned from tasks'),'◈ '+num(an.earned))}${stat(L('Потрачено в магазине','Spent in shop'),'◈ '+num(an.spent))}${stat(L('Бурмалда (итог)','Gambling net'),'◈ '+sign(an.gamble))}${stat(L('Корректировки','Adjustments'),'◈ '+sign(an.adjCoins))}${stat('W / L',an.wins+' / '+an.losses)}${stat(L('Старт','Start'),fmtD(an.start))}${stat(L('Рутин / метрик / дел','Routines / metrics / tasks'),`${an.nRout} / ${an.nMet} / ${an.nTasks}`)}`:`<div class="empty">${an&&an.err?esc(an.err):L('Нет облачного сохранения','No cloud save yet')}</div>`}
+    ${an&&an.li?admLuck(an,P,id):''}
+    ${D.state&&!D.state.__reset?admControls(D,id):''}
+    <h3 style="margin-top:14px">${L('Корректировка','Adjustment')}</h3>
+    <div class="row" style="gap:6px"><input id="admE" type="number" placeholder="± ELO" style="width:90px"><input id="admC" type="number" placeholder="± ◈" style="width:90px"><input id="admR" type="text" placeholder="${L('причина','reason')}" style="flex:1" maxlength="200"></div>
+    <div class="row" style="margin-top:8px"><button class="btn pri" data-adm="adj" data-id="${esc(id)}">${L('Применить','Apply')}</button><span class="sp"></span><button class="btn ghost" data-adm="reset" data-id="${esc(id)}" style="color:var(--loss)">♻️ ${L('Сбросить прогресс','Reset progress')}</button></div>
+    ${(D.adj||[]).length?`<table class="mh" style="margin-top:10px"><tbody>${D.adj.map(a=>`<tr><td style="font-size:12px">${fmtD(ds(new Date(a.at)))}</td><td class="mono">${sign(a.elo)} ELO · ◈${sign(a.coins)}</td><td style="font-size:12px;color:var(--muted)">${esc(a.reason)}</td><td style="text-align:right"><button class="ib" data-adm="adjdel" data-d="${a.id}" data-id="${esc(id)}">✕</button></td></tr>`).join('')}</tbody></table>`:''}
+  </div>
+  ${an&&an.days?`<div class="card" style="margin-top:14px;overflow-x:auto"><h3>${L('За что ELO и монеты (30 дней)','Where ELO & coins came from (30 days)')}</h3><table class="mh"><thead><tr><th>${L('День','Day')}</th><th>ELO</th><th>◈</th><th>${L('Что сделал','Done')}</th></tr></thead><tbody>${an.days.filter(x=>x.it.length||x.elo||x.coins||x.gamble||x.shop).map(x=>`<tr><td style="white-space:nowrap;vertical-align:top">${fmtD(x.d)}${x.match?`<div><span class="pill ${x.match.win?'w':'l'}">${x.match.r}%</span></div>`:''}</td><td class="mono" style="vertical-align:top;color:${x.elo>=0?'var(--win)':'var(--loss)'}">${sign(x.elo)}</td><td class="mono" style="vertical-align:top">+${x.coins}${x.gamble?`<div style="color:${x.gamble>0?'var(--gold)':'var(--loss)'};font-size:11px">🎲 ${sign(x.gamble)}</div>`:''}${x.shop?`<div style="color:var(--dim);font-size:11px">🛒 −${x.shop}</div>`:''}</td><td style="font-size:12px;color:var(--muted)">${x.it.map(([i,tt,c])=>`<div>${i} ${esc(tt)} ${cn(an.cats,c)}</div>`).join('')||'—'}</td></tr>`).join('')}</tbody></table></div>`:''}`}
+/* --- удача --- */
+function admPh(p){if(!p.pid)return'<span style="color:var(--dim)">—</span>';const f=['cold','warm','hot'].includes(p.luck_phase)?p.luck_phase:phaseOf(p.pid).ph;const sk=streakOf(p.lh);
+  return`${PHN()[f]}${p.luck_phase?' 📌':''}${+p.luck_add?` <b style="color:${p.luck_add>0?'var(--win)':'var(--loss)'}">${p.luck_add>0?'+':''}${Math.round(p.luck_add*100)}%</b>`:''}${sk.ls>=2?` <span style="color:var(--dim)">L${sk.ls}</span>`:sk.ws>=2?` <span style="color:var(--dim)">W${sk.ws}</span>`:''}`}
+function admLuck(an,P,id){const li=an.li,c=an.ch,pc=x=>(x*100).toFixed(1)+'%',sg=x=>`<b style="color:${x>0?'var(--win)':x<0?'var(--loss)':'var(--muted)'}">${x>0?'+':''}${Math.round(x*100)}%</b>`;
+  const row=(k,v)=>`<div class="kv"><span>${k}</span><span class="mono">${v}</span></div>`;
+  return`<h3 style="margin-top:14px">🎲 ${L('Удача сейчас','Luck right now')}</h3>
+   <div style="font-size:22px;font-weight:800;margin:4px 0">×${li.total.toFixed(2)} <span style="font-size:14px">${PHN()[li.phase]}${li.forced?' 📌':''}</span></div>
+   <div style="font-size:11px;color:var(--dim);margin-bottom:6px">${li.forced?L('фаза закреплена тобой','phase pinned by you'):L(`смена фазы через ${li.left} мин`,`phase changes in ${li.left} min`)}</div>
+   ${row(L('Фаза','Phase'),sg(li.ph))}${row(L('Как идёт день','How the day goes'),sg(li.day))}${row(L('Компенсация серии','Streak compensation'),`${sg(li.streak)} <span style="color:var(--dim)">${li.ls?L('проигр. подряд ','losses ')+li.ls:li.ws?L('побед подряд ','wins ')+li.ws:''}</span>`)}${row(L('Твоя подкрутка игроку','Your tweak'),sg(li.adm))}${li.glob?row(L('Общая подкрутка','Global tweak'),sg(li.glob)):''}
+   <div style="font-size:11px;color:var(--muted);margin:8px 0 4px">${L('Реальные шансы сейчас','Real chances now')}</div>
+   ${row(L('Апгрейд x2 (показано 50%)','Upgrade x2 (shown 50%)'),pc(c.x2))}${row(L('Апгрейд x5 (показано 20%)','Upgrade x5 (shown 20%)'),pc(c.x5))}${row(L('Апгрейд x10 (показано 10%)','Upgrade x10 (shown 10%)'),pc(c.x10))}
+   ${row(L('Рулетка красное/чёрное','Roulette red/black'),pc(c.red))}${row(L('Рулетка зелёное','Roulette green'),pc(c.green))}${row(L('Краш дойдёт до x2','Crash reaches x2'),pc(c.crash2))}${row(L('Кейс: редкое и выше','Case: rare or better'),pc(c.rare))}
+   ${row(L('Ставок всего / в плюс / в минус','Bets total / won / lost'),`${an.bets} / ${an.betW} / ${an.betL}`)}${an.lh?row(L('Последние исходы','Recent results'),an.lh.replace(/w/g,'🟢').replace(/l/g,'🔴')):''}
+   <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><span style="font-size:12px;color:var(--muted)">${L('Подкрутка','Tweak')}</span>
+    <input id="admLuckAdd" type="range" min="-60" max="60" step="5" value="${Math.round((+P.luck_add||0)*100)}" style="flex:1;min-width:120px" oninput="document.getElementById('admLuckV').textContent=(this.value>0?'+':'')+this.value+'%'"><b id="admLuckV" class="mono" style="width:48px">${(+P.luck_add>0?'+':'')+Math.round((+P.luck_add||0)*100)}%</b>
+    <select id="admLuckPh"><option value="">${L('Фаза: авто','Phase: auto')}</option>${['cold','warm','hot'].map(k=>`<option value="${k}" ${P.luck_phase===k?'selected':''}>📌 ${PHN()[k]}</option>`).join('')}</select>
+    <button class="btn pri" data-adm="luck" data-id="${esc(id)}">${L('Применить','Apply')}</button>${+P.luck_add||P.luck_phase?`<button class="btn ghost" data-adm="luck0" data-id="${esc(id)}">${L('Сброс','Reset')}</button>`:''}</div>`}
+/* --- управление игроком: правим его сохранение напрямую --- */
+function admControls(D,id){const st=D.state,inv=st.inv||{},prof=st.profile||{};
+  const opt=(obj,have)=>Object.entries(obj).map(([k,v])=>`<option value="${k}">${have.includes(k)?'✓ ':''}${esc(nm(v.n))}</option>`).join('');
+  return`<h3 style="margin-top:14px">${L('Управление игроком','Player controls')}</h3>
+  <div class="row" style="gap:6px;margin-bottom:6px"><input id="admNick" type="text" maxlength="20" value="${esc(prof.nick||'')}" style="flex:1"><button class="btn" data-adm="nick" data-id="${esc(id)}">${L('Сменить ник','Rename')}</button>${prof.ava?`<button class="btn ghost" data-adm="noava" data-id="${esc(id)}">${L('Убрать аватар','Remove avatar')}</button>`:''}</div>
+  <div class="row" style="gap:6px;margin-bottom:6px"><select id="admTheme" style="flex:1">${opt(THEMES,inv.themes||[])}</select><button class="btn" data-adm="theme+" data-id="${esc(id)}">${L('Выдать','Give')}</button><button class="btn ghost" data-adm="theme-" data-id="${esc(id)}">${L('Забрать','Take')}</button></div>
+  <div class="row" style="gap:6px;margin-bottom:6px"><select id="admBg" style="flex:1">${opt(BGS,inv.bgs||[])}</select><button class="btn" data-adm="bg+" data-id="${esc(id)}">${L('Выдать','Give')}</button><button class="btn ghost" data-adm="bg-" data-id="${esc(id)}">${L('Забрать','Take')}</button></div>
+  <div class="row" style="gap:6px;margin-bottom:6px"><span style="font-size:12px;color:var(--muted)">🛡 ${L('Страховки апгрейда','Upgrade shields')}</span><input id="admSh" type="number" min="0" value="${+inv.shield||0}" style="width:80px"><button class="btn" data-adm="shield" data-id="${esc(id)}">${L('Поставить','Set')}</button><span class="sp"></span><button class="btn ghost" data-adm="json" data-id="${esc(id)}">{ } ${L('Всё сохранение (JSON)','Full save (JSON)')}</button></div>
+  ${UI.adm.json?`<textarea id="admJson" rows="14" style="width:100%;font-family:monospace;font-size:11px">${esc(JSON.stringify(st,null,1))}</textarea><div class="row" style="margin-top:6px"><button class="btn pri" data-adm="jsonsave" data-id="${esc(id)}">${L('Сохранить JSON игроку','Save JSON to player')}</button><span style="font-size:11px;color:var(--dim)">${L('Здесь можно поменять что угодно: дела, рутины, квесты, инвентарь, профиль.','Edit anything here: tasks, routines, quests, inventory, profile.')}</span></div>`:''}
+  <div class="row" style="margin-top:6px"><span class="sp"></span><button class="btn ghost" data-adm="delete" data-id="${esc(id)}" style="color:var(--loss)">🗑 ${L('Удалить игрока','Delete player')}</button></div>`}
+async function admSave(id,mut,msg){const D=UI.adm.det;if(!D||!D.state)return;const st=JSON.parse(JSON.stringify(D.state));st.inv=st.inv||{themes:['mint'],shield:0,bgs:[]};st.inv.themes=st.inv.themes||['mint'];st.inv.bgs=st.inv.bgs||[];st.profile=st.profile||{};
+  if(mut(st)===false)return;await api('admin_set_state',{id,state:st});toast(msg||L('✅ Сохранено игроку','✅ Saved to player'));admLoad();admOpen(id)}
+/* --- настройки игры --- */
+function admGame(){const g=(o,k)=>o&&o[k]!=null?o[k]:'';const c=CFG||{},d=DEF||{};
+  const num=(path,label,def,step)=>{const [a,b]=path.split('.');const v=b?g(c[a],b):g(c,a);return`<div class="fld" style="margin-bottom:8px"><label>${label} <span style="color:var(--dim)">(${L('станд.','def.')} ${def})</span></label><input type="number" ${step?`step="${step}"`:''} data-cfg="${path}" value="${esc(v)}" placeholder="${def}"></div>`};
+  const games=MODES.toString?['upgrade','cases','crash','roul','bj']:[];const gn={upgrade:L('Апгрейд','Upgrade'),cases:L('Кейсы','Cases'),crash:L('Краш','Crash'),roul:L('Рулетка','Roulette'),bj:L('Блэкджек','Blackjack')};
+  const D0=d.caps||{},F0=d.fixed||{};
+  return`<p class="sub">${L('Пустое поле = стандартное значение. Меняется у всех игроков при следующем заходе.','Empty = default. Applies to all players on next open.')}</p>
+  <div class="grid3" style="align-items:start">
+   <div class="card"><h3>🧢 ${L('Лимиты в день','Daily caps')}</h3>
+    ${num('caps.eloCat',L('ELO с одной категории','ELO per category'),D0.eloCat)}${num('caps.eloDay',L('ELO за все дела','ELO from all tasks'),D0.eloDay)}${num('caps.eloQuest',L('ELO за квесты','ELO from quests'),D0.eloQuest)}
+    ${num('caps.coinCat',L('Монет с одной категории','Coins per category'),D0.coinCat)}${num('caps.coinDay',L('Монет за все дела','Coins from all tasks'),D0.coinDay)}${num('caps.coinQuest',L('Монет за квесты','Coins from quests'),D0.coinQuest)}${num('caps.coinBonus',L('Монет за недельные бонусы','Coins from weekly bonuses'),D0.coinBonus)}
+    ${num('maxEloDay',L('Сервер: макс. рост ELO в сутки','Server: max ELO gain per day'),300)}</div>
+   <div class="card"><h3>📐 ${L('Правила ELO','ELO rules')}</h3>
+    ${num('fixed.eloTask',L('ELO за дело','ELO per task'),F0.eloTask)}${num('fixed.eloRoutine',L('ELO за рутину','ELO per routine'),F0.eloRoutine)}${num('fixed.eloStep',L('ELO за шаг квеста','ELO per quest step'),F0.eloStep)}
+    ${num('fixed.mainElo',L('ELO за сюжетный квест','ELO per main quest'),F0.mainElo)}${num('fixed.sideElo',L('ELO за побочку','ELO per side quest'),F0.sideElo)}${num('fixed.win',L('Порог победы дня, %','Day win threshold, %'),F0.win)}
+    ${num('fixed.perfectBonus',L('Бонус за 100% день','100% day bonus'),F0.perfectBonus)}${num('fixed.relapsePen',L('Штраф за срыв','Slip penalty'),F0.relapsePen)}${num('fixed.eloStart',L('Стартовое ELO','Starting ELO'),F0.eloStart)}${num('fixed.focusRate',L('Монет за минуту фокуса','Coins per focus minute'),F0.focusRate,'0.1')}
+    <h3 style="margin-top:12px">🧘 ${L('Дисциплина','Discipline')}</h3>
+    ${num('mrew.elo',L('ELO за показатель','ELO per metric'),(d.mrew||{}).elo)}${num('mrew.coins',L('Монет за показатель','Coins per metric'),(d.mrew||{}).coins)}${num('arew.elo',L('ELO за чистый день','ELO per clean day'),(d.arew||{}).elo)}${num('arew.coins',L('Монет за чистый день','Coins per clean day'),(d.arew||{}).coins)}</div>
+   <div class="card"><h3>🎰 ${L('Бурмалда','Burmalda')}</h3>
+    ${games.map(k=>`<label class="row" style="font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" data-cfg="games.${k}" ${gameOn(k)?'checked':''}> ${gn[k]}</label>`).join('')}
+    ${num('luckAdd',L('Общая подкрутка удачи всем (−0.6…0.6)','Global luck tweak (−0.6…0.6)'),0,'0.05')}${num('phaseAmp',L('Сила фаз холодная/горячая','Cold/hot phase strength'),0.15,'0.01')}${num('luckWindow',L('Длина фазы, мин','Phase length, min'),40)}
+    ${num('stakeShare',L('Доля баланса на ставку (0–1)','Max stake share (0–1)'),0.5,'0.05')}${num('floor',L('Неприкосновенный запас от заработанного (0–1)','Untouchable reserve of earned (0–1)'),0.1,'0.05')}
+    <h3 style="margin-top:12px">📦 ${L('Цены кейсов','Case prices')}</h3>
+    ${(d.cases||[]).map(x=>num('casePrice.'+x.id,`${x.ico} ${nm(x.n)}`,x.cost)).join('')}
+    <h3 style="margin-top:12px">📅 ${L('Сезоны','Seasons')}</h3>
+    ${num('seasonMonths',L('Длина сезона, мес.','Season length, months'),d.seasonMonths)}
+    <div class="fld" style="margin-bottom:8px"><label>${L('Дата старта 1-го сезона','Season 1 start')} <span style="color:var(--dim)">(${d.seasonEpoch})</span></label><input type="text" data-cfg="seasonEpoch" value="${esc(c.seasonEpoch||'')}" placeholder="${d.seasonEpoch}"></div>
+    <div style="font-size:11px;color:var(--loss)">${L('⚠️ Смена сезонов посреди сезона пересчитает рейтинг у всех.','⚠️ Changing seasons mid-season recalculates everyone\'s rating.')}</div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>{ } ${L('Кейсы целиком: содержимое и шансы (JSON)','Cases in full: contents & odds (JSON)')}</h3><div style="font-size:11px;color:var(--muted);margin-bottom:6px">${L('t: coins/theme/bg/shield/ch · v: монеты · r: редкость c/u/r/e/l · w: вес (шанс). Оставь как есть, если не нужно.','t: coins/theme/bg/shield/ch · v: coins · r: rarity · w: weight. Leave as is if not needed.')}</div>
+   <textarea id="admCases" rows="10" style="width:100%;font-family:monospace;font-size:11px">${esc(JSON.stringify(Array.isArray(c.cases)&&c.cases.length?c.cases:d.cases,null,1))}</textarea></div>
+  <div class="row" style="margin-top:14px"><button class="btn pri" data-adm="cfgsave">💾 ${L('Сохранить для всех','Save for everyone')}</button><button class="btn ghost" data-adm="cfgreset" style="color:var(--loss)">${L('Сбросить всё к стандарту','Reset all to defaults')}</button></div>`}
+function admCollect(){const out={};document.querySelectorAll('[data-cfg]').forEach(el=>{const [a,b]=el.dataset.cfg.split('.');let v;
+    if(el.type==='checkbox'){if(el.checked)return;v=false}else{v=el.value.trim();if(v==='')return;if(el.type==='number'){v=+v;if(!isFinite(v))return}}
+    if(b){(out[a]??={})[b]=v}else out[a]=v});
+  const ta=$('#admCases');if(ta){try{const arr=JSON.parse(ta.value);const def=JSON.stringify((DEF||{}).cases);if(Array.isArray(arr)&&JSON.stringify(arr)!==def){if(!arr.every(x=>x&&x.id&&Array.isArray(x.items)&&x.items.length))throw 0;out.cases=arr}}catch(e){toast(L('JSON кейсов с ошибкой — не сохранил','Cases JSON is invalid'));return null}}
+  return out}
+function admAdmins(){if(!UI.adm.admins){api('admin_admins',{}).then(j=>{UI.adm.admins=j.admins||[];render()}).catch(e=>toast(String(e.message||e)))}
+  const name=id=>{const p=(UI.adm.list||[]).find(x=>x.id===id);return p?`${esc(p.nick||'')} ${p.tg_username?'@'+esc(p.tg_username):''}`:''};
+  return`<div class="card" style="max-width:560px"><h3>🛡 ${L('Кто админ','Admins')}</h3>${(UI.adm.admins||[]).map(id=>`<div class="row" style="margin-bottom:6px"><span class="mono">${esc(id)}</span><span style="color:var(--muted);font-size:12px">${name(id)}</span><span class="sp"></span>${id===S.net.uid?`<span class="pill">${L('ты','you')}</span>`:`<button class="ib" data-adm="adminrm" data-d="${esc(id)}">✕</button>`}</div>`).join('')||'…'}
+   <div class="row" style="margin-top:10px"><input id="admAddId" type="text" placeholder="${L('Telegram ID (код друга)','Telegram ID (friend code)')}" style="flex:1"><button class="btn" data-adm="adminadd">${L('Сделать админом','Make admin')}</button></div>
+   <div style="font-size:11px;color:var(--loss);margin-top:8px">${L('Админ получает такой же полный контроль, как ты.','An admin gets the same full control as you.')}</div></div>`}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-adm]');if(!b||!ADM.admin)return;const k=b.dataset.adm,id=b.dataset.id;
+  try{
+    if(k==='view'){UI.adm.view=b.dataset.d;render();return}
+    if(k==='luck'||k==='luck0'){const add=k==='luck0'?0:(+$('#admLuckAdd').value||0)/100,phase=k==='luck0'?'':$('#admLuckPh').value;await api('admin_luck',{id,add,phase});toast(L('🎲 Удача обновлена — игрок получит в течение 1.5 мин','🎲 Luck updated — reaches the player within 1.5 min'));admLoad();admOpen(id);return}
+    if(k==='nick'){const v=$('#admNick').value.trim().slice(0,20);if(!v)return;await admSave(id,st=>{st.profile.nick=v});return}
+    if(k==='noava'){await admSave(id,st=>{st.profile.ava='';st.profile.ava48=''});return}
+    if(k==='theme+'||k==='theme-'){const t=$('#admTheme').value;await admSave(id,st=>{if(k==='theme+'){if(!st.inv.themes.includes(t))st.inv.themes.push(t)}else{if(t==='mint')return false;st.inv.themes=st.inv.themes.filter(x=>x!==t);if(st.settings&&st.settings.theme===t)st.settings.theme='mint'}});return}
+    if(k==='bg+'||k==='bg-'){const t=$('#admBg').value;await admSave(id,st=>{if(k==='bg+'){if(!st.inv.bgs.includes(t))st.inv.bgs.push(t)}else{st.inv.bgs=st.inv.bgs.filter(x=>x!==t);if(st.settings&&st.settings.bg===t)st.settings.bg='none'}});return}
+    if(k==='shield'){const v=Math.max(0,Math.round(+$('#admSh').value||0));await admSave(id,st=>{st.inv.shield=v});return}
+    if(k==='json'){UI.adm.json=!UI.adm.json;render();return}
+    if(k==='jsonsave'){let st;try{st=JSON.parse($('#admJson').value)}catch(err){toast(L('JSON с ошибкой','Invalid JSON'));return}if(!st||typeof st!=='object'||!Array.isArray(st.routines)){toast(L('Это не похоже на сохранение VOZDUH','Not a VOZDUH save'));return}await admSave(id,s2=>{for(const k2 in s2)delete s2[k2];Object.assign(s2,st)});UI.adm.json=false;return}
+    if(k==='delete'){ask(L('Удалить игрока полностью вместе с прогрессом?','Delete player and all progress?'),async()=>{try{await api('admin_delete',{id});UI.adm.sel=null;UI.adm.det=null;toast('🗑');admLoad()}catch(err){toast(String(err.message||err))}},L('Удалить','Delete'));return}
+    if(k==='cfgsave'){const c=admCollect();if(!c)return;await api('admin_cfg',{cfg:c});CFG=c;saveCFG();applyCFG();toast(L('💾 Настройки сохранены для всех','💾 Saved for everyone'));render();return}
+    if(k==='cfgreset'){ask(L('Вернуть все настройки игры к стандартным?','Reset all game settings to defaults?'),async()=>{try{await api('admin_cfg',{cfg:{}});CFG={};saveCFG();applyCFG();render();toast('↺')}catch(err){toast(String(err.message||err))}},L('Сбросить','Reset'));return}
+    if(k==='adminadd'){const v=$('#admAddId').value.trim();if(!/^\d{3,15}$/.test(v)){toast(L('Нужен числовой Telegram ID','Numeric Telegram ID needed'));return}const j=await api('admin_admins',{add:v});UI.adm.admins=j.admins;render();return}
+    if(k==='adminrm'){const j=await api('admin_admins',{remove:b.dataset.d});UI.adm.admins=j.admins;render();return}
+
+    if(k==='reload'){UI.adm.list=null;admLoad();return}
+    if(k==='open'){admOpen(id);return}
+    if(k==='ann'){await api('admin_ann',{text:$('#admAnn').value});ADM.ann=$('#admAnn').value.trim();UI.adm.ann=ADM.ann;saveADM();toast(L('📢 Опубликовано','📢 Published'));render();return}
+    if(k==='adj'){const el=+$('#admE').value||0,co=+$('#admC').value||0,r=$('#admR').value.trim();if(!el&&!co){toast(L('Впиши ELO или монеты','Enter ELO or coins'));return}if(!r){toast(L('Напиши причину','Add a reason'));return}
+      await api('admin_adjust',{id,elo:el,coins:co,reason:r});toast(L('✅ Применено','✅ Applied'));admLoad();admOpen(id);return}
+    if(k==='adjdel'){await api('admin_adj_del',{adj_id:+b.dataset.d});admLoad();admOpen(id);return}
+    if(k==='ban'){await api('admin_ban',{id,banned:b.dataset.d==='1'});admLoad();admOpen(id);return}
+    if(k==='reset'){ask(L('Сбросить весь прогресс игрока? Это нельзя отменить.','Reset all of this player\'s progress? Cannot be undone.'),async()=>{try{await api('admin_reset',{id});toast(L('♻️ Сброшено','♻️ Reset'));admLoad();admOpen(id)}catch(err){toast(String(err.message||err))}},L('Сбросить','Reset'));return}
+  }catch(err){toast(String(err.message||err))}});
+document.addEventListener('input',e=>{if(e.target.id==='admQ'){UI.adm.q=e.target.value;const pos=e.target.selectionStart;render();const q=$('#admQ');if(q){q.focus();q.setSelectionRange(pos,pos)}}});
+/* ---- лимиты ---- */
+function bar(v,max,col){const pct=Math.min(100,Math.round(v/max*100));return`<div style="height:6px;border-radius:4px;background:var(--panel2,#1b1e23);overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:${pct>=100?'var(--loss)':col}"></div></div>`}
+function limitsCard(){const C=LASTC||compute(),T={...(C.capT||{elo:{},eloSum:0,quest:0,coins:{},coinSum:0})};
+  const names={_anti:L('Отказы','Quit habits'),_metric:L('Метрики','Metrics'),_focus:L('Фокус','Focus'),_:L('Без категории','No category')};
+  const known=new Set([...S.cats.map(c=>c.id),'_anti','_metric','_focus']),E={},M={};
+  for(const k in T.elo){const kk=known.has(k)?k:'_';E[kk]=(E[kk]||0)+T.elo[k]}for(const k in T.coins){const kk=known.has(k)?k:'_';M[kk]=(M[kk]||0)+T.coins[k]}
+  T.elo=E;T.coins=M;const keys=[...new Set([...S.cats.map(c=>c.id),...Object.keys(E),...Object.keys(M)])];
+  const rows=keys.map(k=>{const c=S.cats.find(x=>x.id===k);const nm0=c?c.name:(names[k]||names._),col=c?c.color:'#8a9bb0';const e=Math.min(CAPS.eloCat,T.elo[k]||0),m=Math.min(CAPS.coinCat,T.coins[k]||0);
+    return`<div style="margin-bottom:10px"><div class="row" style="font-size:12px"><span style="color:${col};font-weight:700">${esc(nm0)}</span><span class="sp"></span><span class="mono" style="color:var(--muted)">${e}/${CAPS.eloCat} ELO · ◈ ${m}/${CAPS.coinCat}</span></div>${bar(e,CAPS.eloCat,col)}</div>`}).join('');
+  return`<div class="card"><h3>${L('Правила и лимиты','Rules & limits')}</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${L('Правила одинаковые для всех, чтобы топ был честным. Отмечать дела можно сколько угодно, но награда за день ограничена:','Same rules for everyone so the board is fair. You can tick as much as you want, but daily rewards are capped:')}<br>
+    • ${L(`с одной категории — до <b>${CAPS.eloCat} ELO</b> и <b>◈ ${CAPS.coinCat}</b>`,`per category — up to <b>${CAPS.eloCat} ELO</b> and <b>◈ ${CAPS.coinCat}</b>`)}<br>
+    • ${L(`за все дела за день — до <b>${CAPS.eloDay} ELO</b> и <b>◈ ${CAPS.coinDay}</b>`,`all tasks per day — up to <b>${CAPS.eloDay} ELO</b> and <b>◈ ${CAPS.coinDay}</b>`)}<br>
+    • ${L(`квесты и побочки — до <b>${CAPS.eloQuest} ELO</b> и <b>◈ ${CAPS.coinQuest}</b> в день`,`quests & side quests — up to <b>${CAPS.eloQuest} ELO</b> and <b>◈ ${CAPS.coinQuest}</b> a day`)}<br>
+    • ${L(`дисциплина: каждый показатель и отказ — <b>+${MREW.elo} ELO · ◈ ${MREW.coins}</b>, всего до <b>${CAPS.eloCat} ELO</b> и <b>◈ ${CAPS.coinCat}</b> в день на показатели и столько же на отказы`,`discipline: each metric / quit habit — <b>+${MREW.elo} ELO · ◈ ${MREW.coins}</b>, up to <b>${CAPS.eloCat} ELO</b> and <b>◈ ${CAPS.coinCat}</b> a day for metrics, same for quit habits`)}<br>
+    • ${L(`отмечать можно только <b>сегодня и вчера</b>`,`you can only tick <b>today and yesterday</b>`)}<br>
+    • ${L(`недельные бонусы рутин — до <b>◈ ${CAPS.coinBonus}</b> в день`,`weekly routine bonuses — up to <b>◈ ${CAPS.coinBonus}</b> a day`)}</div>
+    <h3 style="font-size:12px">${L('Сегодня','Today')} · <span class="mono">${Math.min(CAPS.eloDay,T.eloSum)}/${CAPS.eloDay} ELO · ◈ ${Math.min(CAPS.coinDay,T.coinSum)}/${CAPS.coinDay}</span></h3>${bar(T.eloSum,CAPS.eloDay,'var(--gold)')}<div style="height:10px"></div>${rows}</div>`}
 /* ---- настройки ---- */
 function vSettings(){
   const st=S.settings,preset=CURS.find(c=>c[0]===st.cur&&c[1]===st.curPos);
@@ -1689,16 +1934,8 @@ function vSettings(){
         <div class="fld"><label>${L('Позиция','Position')}</label><select data-chg="curpos"><option value="after" ${st.curPos==='after'?'selected':''}>100 ${esc(st.cur)}</option><option value="before" ${st.curPos==='before'?'selected':''}>${esc(st.cur)}100</option></select></div></div>
       <div style="font-size:12px;color:var(--muted);margin-top:8px">${L('Пример','Example')}: <b class="mono">${money(1500)}</b></div>
     </div>
-    <div class="card"><h3>${L('Правила игры','Game rules')}</h3>
-      <div class="fld" style="margin-bottom:10px"><label>${L('Порог победы дня, %','Day win threshold, %')}</label><input type="number" min="10" max="100" value="${st.win}" data-chg="set" data-id="win"></div>
-      <div class="fld" style="margin-bottom:10px"><label>${L('ELO за сюжетный квест','ELO per main quest')}</label><input type="number" min="0" value="${st.mainElo}" data-chg="set" data-id="mainElo"></div>
-      <div class="fld" style="margin-bottom:10px"><label>${L('ELO за побочку','ELO per side quest')}</label><input type="number" min="0" value="${st.sideElo}" data-chg="set" data-id="sideElo"></div>
-      <div class="row" style="margin-bottom:10px;gap:8px"><div class="fld" style="flex:1"><label>${L('ELO за дело','ELO / task')}</label><input type="number" min="0" value="${st.eloTask}" data-chg="set" data-id="eloTask"></div><div class="fld" style="flex:1"><label>${L('за рутину','/ routine')}</label><input type="number" min="0" value="${st.eloRoutine}" data-chg="set" data-id="eloRoutine"></div><div class="fld" style="flex:1"><label>${L('за шаг квеста','/ quest step')}</label><input type="number" min="0" value="${st.eloStep}" data-chg="set" data-id="eloStep"></div></div>
-      <div class="row" style="margin-bottom:10px;gap:8px"><div class="fld" style="flex:1"><label>${L('Бонус за 100% день','100% day bonus')}</label><input type="number" min="0" value="${st.perfectBonus}" data-chg="set" data-id="perfectBonus"></div><div class="fld" style="flex:1"><label>${L('Множитель серии','Streak multiplier')}</label><select data-chg="smult"><option value="1" ${st.streakMult!==false?'selected':''}>${L('Вкл (+10% за победу, до ×2)','On (+10% per win, up to ×2)')}</option><option value="0" ${st.streakMult===false?'selected':''}>${L('Выкл','Off')}</option></select></div></div>
-      <div class="fld" style="margin-bottom:10px"><label>${L('Стартовое ELO','Starting ELO')}</label><input type="number" min="100" value="${st.eloStart}" data-chg="set" data-id="eloStart"></div>
-      <div class="fld"><label>${L('Дата старта сезона','Season start date')}</label><input type="date" value="${S.start}" data-chg="start"></div>
-    </div>
-    <div class="card"><h3>${L('Категории','Categories')}</h3>${S.cats.map(c=>`<div class="catrow"><input type="color" value="${c.color}" data-chg="ccol" data-id="${c.id}"><input type="text" value="${esc(c.name)}" data-chg="cname" data-id="${c.id}"><button class="ib" data-act="cdel" data-id="${c.id}">✕</button></div>`).join('')}<button class="btn" data-act="cadd">${L('+ Категория','+ Category')}</button></div>
+    ${limitsCard()}
+    <div class="card"><h3>${L('Категории','Categories')} · ${S.cats.length}</h3><div style="font-size:12px;color:var(--muted);margin-bottom:10px">${L('Список общий для всех — у каждой категории свой дневной лимит.','Shared list for everyone — each category has its own daily cap.')}</div><div class="chips" style="margin:0">${S.cats.map(c=>`<span class="chip" style="cursor:default;border-color:${c.color}55"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</span>`).join('')}</div></div>
     <div class="card" style="grid-column:span 2"><h3>${L('Тема оформления','Theme')}</h3>${themeChips()}<h3 style="margin-top:16px">${L('Фон / узор','Background / pattern')}</h3>${bgChips()}<div class="row" style="margin-top:14px"><span style="font-size:12px;color:var(--muted)">${L('Темы и фоны выпадают из кейсов «Темы» и «Фоны».','Themes and backgrounds drop from the Themes and Backgrounds cases.')}</span></div></div>
     <div class="card"><h3>${L('Данные','Data')}</h3>
       <div class="row" style="flex-direction:column;align-items:stretch">
@@ -1803,11 +2040,11 @@ function rewardModal(r){
 const find=(arr,id)=>arr.find(x=>x.id===id);
 const A={
   wk:(_,d)=>{UI.week=d==='0'?mondayOf(today()):add(UI.week,+d)},
-  tk:(id,_,b)=>{const x=find(S.tasks,id);x.done=!x.done;if(x.done){SND.pop();FX.pop(b,cat(x.cat).color);eloFloat(b,S.settings.eloTask)}else SND.undo()},
+  tk:(id,_,b)=>{const x=find(S.tasks,id);if(!x.done&&x.date&&!OKDAY(x.date)){toast(L('Старые дела закрывать нельзя — перенеси на сегодня','Can\'t close old tasks — move it to today'));return'skip'}x.done=!x.done;if(x.done){SND.pop();FX.pop(b,cat(x.cat).color);capFloat(b,S.settings.eloTask,x.cat)}else SND.undo()},
   tdel:id=>{S.tasks=S.tasks.filter(x=>x.id!==id)},
   tmove:id=>{SND.undo();const x=find(S.tasks,id);x.date=add(x.date,1);x.done=false;toast(L('Перенесено на ','Moved to ')+fmtD(x.date))},
   tedit:id=>{const x=find(S.tasks,id);openModal(L('Изменить дело','Edit task'),[{k:'title',label:L('Дело','Task'),value:x.title,req:true},catSel(x.cat),{k:'coins',label:L('Монеты','Coins'),type:'number',value:x.coins},{k:'date',label:L('Дата','Date'),type:'date',value:x.date,req:true}],o=>{Object.assign(x,o)});return'skip'},
-  rt:(id,d,b)=>{if(d>today())return;S.rlog[d]??={};if(S.rlog[d][id]){delete S.rlog[d][id];SND.undo()}else{S.rlog[d][id]=true;SND.pop();eloFloat(b,S.settings.eloRoutine);const r=find(S.routines,id);FX.pop(b,r?cat(r.cat).color:null)}if(!Object.keys(S.rlog[d]).length)delete S.rlog[d]},
+  rt:(id,d,b)=>{if(d>today())return;if(!(S.rlog[d]||{})[id]&&!OKDAY(d)){toast(L('Отмечать можно только сегодня и вчера','You can only tick today and yesterday'));return'skip'}S.rlog[d]??={};if(S.rlog[d][id]){delete S.rlog[d][id];SND.undo()}else{S.rlog[d][id]=true;SND.pop();{const rr=find(S.routines,id);capFloat(b,S.settings.eloRoutine,rr&&rr.cat)}const r=find(S.routines,id);FX.pop(b,r?cat(r.cat).color:null)}if(!Object.keys(S.rlog[d]).length)delete S.rlog[d]},
   radd:(_,d)=>{routineModal(null,d);return'skip'},
   redit:id=>{routineModal(find(S.routines,id));return'skip'},
   rarch:id=>{const r=find(S.routines,id);r.archivedAt=r.archivedAt?null:today()},
@@ -1815,7 +2052,7 @@ const A={
   qadd:()=>{questModal();return'skip'},
   qedit:id=>{questModal(find(S.quests,id));return'skip'},
   qdel:id=>{ask(L('Удалить квест?','Delete quest?'),()=>{S.quests=S.quests.filter(q=>q.id!==id)},L('Удалить','Delete'));return'skip'},
-  qstep:(id,s,b)=>{const st=find(find(S.quests,id).steps,s);st.done=!st.done;if(st.done){st.doneAt=today();SND.pop();FX.pop(b,'#ffc800');eloFloat(b,S.settings.eloStep)}else{delete st.doneAt;SND.undo()}},
+  qstep:(id,s,b)=>{const st=find(find(S.quests,id).steps,s);st.done=!st.done;if(st.done){st.doneAt=today();SND.pop();FX.pop(b,'#ffc800');capFloat(b,S.settings.eloStep,find(S.quests,id).cat)}else{delete st.doneAt;SND.undo()}},
   qsdel:(id,s)=>{const q=find(S.quests,id);q.steps=q.steps.filter(x=>x.id!==s)},
   qdone:id=>{const q=find(S.quests,id);q.done=true;q.doneDate=today();FX.fireworks(6);FX.flash();SND.bigwin();toast(`📜 ${L('Квест пройден','Quest complete')}: +${q.coins} V, +${S.settings.mainElo} ELO`)},
   qundo:id=>{const q=find(S.quests,id);q.done=false;q.doneDate=null},
@@ -1844,7 +2081,7 @@ const A={
   copen:id=>{openCase(id);return'skip'},
   dropclose:()=>{UI.lastDrop=null},
   theme:id=>{if(!S.inv.themes.includes(id)&&!S.settings.testUnlock)return'skip';S.settings.theme=id;SND.chime()},
-  lang:(_,d)=>{S.settings.lang=d},
+  lang:(_,d)=>{S.settings.lang=d;S.cats=catList(d)},
   cur:(_,d)=>{const c=CURS[+d];S.settings.cur=c[0];S.settings.curPos=c[1];SND.tick()},
   curcustom:()=>{setTimeout(()=>{const i=document.querySelector('[data-chg=cursym]');i&&(i.focus(),i.select())},30);return'skip'},
   grant:()=>'skip',
@@ -1891,8 +2128,8 @@ const A={
   unfriend:id=>{S.friends=S.friends.filter(x=>x!==id);SND.undo()},
   gotop:()=>{UI.tab='top';saveUI()},
   netoff:()=>{S.net={key:'',db:'',uid:'',refresh:'',idToken:'',exp:0};UI.lb={view:'all'}},
-  cadd:()=>{S.cats.push({id:uid(),name:L('Новая','New'),color:'#8be9d0'})},
-  cdel:id=>{ask(L('Удалить категорию? Дела останутся без категории.','Delete category? Tasks will stay uncategorized.'),()=>{S.cats=S.cats.filter(c=>c.id!==id)},L('Удалить','Delete'));return'skip'},
+  cadd:()=>'skip',
+  cdel:()=>'skip',
   export:()=>{const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`vozduh-backup-${today()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);return'skip'},
   import:()=>{$('#importFile').click();return'skip'},
   reset:()=>{ask(L('Сбросить весь прогресс в этом браузере?','Reset all progress in this browser?'),()=>{S=normalize(seed(S.settings.lang));UI.week=mondayOf(today());UI.lastDrop=null;lastLvl=null;lastBonus=null;lastLive=null},L('Сбросить','Reset'));return'skip'},
@@ -1933,14 +2170,13 @@ $('#app').addEventListener('input',e=>{
 $('#app').addEventListener('change',e=>{
   if(e.target.name==='c'&&e.target.value==='__new'){const sel=e.target;sel.value=S.cats[0]?.id||'';openModal(L('Новая категория','New category'),[{k:'name',label:L('Название','Name'),req:true},{k:'color',label:L('Цвет','Color'),type:'color',value:'#8be9d0'}],o=>{S.cats.push({id:uid(),name:o.name.slice(0,24),color:o.color||'#8be9d0'});toast(L('Категория добавлена','Category added'))});return}
   const el=e.target.closest('[data-chg]');if(!el)return;const k=el.dataset.chg,id=el.dataset.id;
-  if(k==='cname')find(S.cats,id).name=el.value.trim()||'—';
-  if(k==='ccol')find(S.cats,id).color=el.value;
   if(k==='set'){S.settings[id]=Math.max(0,+el.value||0);if(id==='win')S.settings.win=Math.min(100,Math.max(10,S.settings.win));if(id==='eloStart')S.settings.eloStart=Math.max(100,S.settings.eloStart)}
   if(k==='start'&&el.value)S.start=el.value;
   if(k==='cursym')S.settings.cur=el.value.trim()||'₽';
   if(k==='curpos')S.settings.curPos=el.value;
   if(k==='smult')S.settings.streakMult=el.value==='1';
-  if(k==='mval'){const m=find(S.metrics,id),d=UI.mday||today();m.log=m.log||{};const was=mHit(m,d);if(el.value==='')delete m.log[d];else m.log[d]=el.value.trim();if(!was&&mHit(m,d)){SND.pop();FX.pop(el,'#3ddc84');eloFloat(el,m.elo||0)}else if(el.value!=='')SND.tick()}
+  if(k==='mval'&&!OKDAY(UI.mday||today())){toast(L('Отмечать можно только сегодня и вчера','You can only log today and yesterday'));render();return}
+  if(k==='mval'){const m=find(S.metrics,id),d=UI.mday||today();m.log=m.log||{};const was=mHit(m,d);if(el.value==='')delete m.log[d];else m.log[d]=el.value.trim();if(!was&&mHit(m,d)){SND.pop();FX.pop(el,'#3ddc84');capFloat(el,MREW.elo,'_metric')}else if(el.value!=='')SND.tick()}
   if(k==='nick')S.profile.nick=el.value.trim().slice(0,20);
   if(k==='netkey'){S.net.key=el.value.trim();S.net.idToken='';S.net.refresh=''}
   if(k==='netdb'){S.net.db=el.value.trim().replace(/\/+$/,'');UI.lb={view:'all'}}
