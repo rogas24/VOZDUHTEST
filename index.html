@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VOZDUH</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="icon" type="image/png" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -424,7 +425,9 @@ const money=n=>{const s=S.settings.cur||'₽';return S.settings.curPos==='before
 /* ============ ОНЛАЙН (топ и друзья) ============
    Впиши сюда данные своего Firebase один раз — и у всех, кто открывает твою страницу,
    будет общий топ. Или оставь пустым и введи их в Настройках (тогда только у тебя). */
-const ONLINE={apiKey:'',databaseURL:''};
+const ONLINE={fn:'https://bpsgmrhlksiijodnbtqq.supabase.co/functions/v1/vozduh',key:'sb_publishable_Wie5BO9uNd3p4iOwustMXA_RX0RJPcr',bot:'vozduhgamebot'};
+const TG=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)?Telegram.WebApp:null;
+var CLOUD={ready:false,t:null,busy:false};
 
 /* ============ сезоны ============ */
 const SEASON_EPOCH='2026-11-01',SEASON_MONTHS=2;
@@ -543,15 +546,15 @@ function seed(lang){
 }
 function normalize(d){
   d.settings={win:60,mainElo:50,sideElo:10,eloStart:1000,anim:'random',lang:'ru',cur:'₽',curPos:'after',theme:'mint',fast:false,focusWork:25,focusBreak:5,focusRate:1,eloTask:3,eloRoutine:2,eloStep:5,perfectBonus:25,streakMult:true,...(d.settings||{})};if(!d.settings.eloV2){if(d.settings.mainElo===50)d.settings.mainElo=80;if(d.settings.sideElo===10)d.settings.sideElo=15;d.settings.eloV2=true}d.luckHist=Array.isArray(d.luckHist)?d.luckHist:[];
-  d.ach=d.ach||{};d.rlog=d.rlog||{};d.upg=d.upg||[];d.cases=d.cases||[];d.grant=+d.grant||0;
-  d.inv={themes:['mint'],shield:0,bgs:[],...(d.inv||{})};if(!Array.isArray(d.inv.bgs))d.inv.bgs=[];d.anti=Array.isArray(d.anti)?d.anti:[];d.metrics=Array.isArray(d.metrics)?d.metrics:[];d.settings.bg=d.settings.bg||'none';d.profile={nick:'',ava:'',ava48:'',...(d.profile||{})};if(!d.profile.id)d.profile.id=uid()+uid();d.cards=Array.isArray(d.cards)?d.cards:[];d.friends=Array.isArray(d.friends)?d.friends:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.games=Array.isArray(d.games)?d.games:[];d.net={key:'',db:'',uid:'',refresh:'',idToken:'',exp:0,...(d.net||{})};if(!d.inv.themes.includes('mint'))d.inv.themes.unshift('mint');
+  d.ach=d.ach||{};d.rlog=d.rlog||{};d.upg=d.upg||[];d.cases=d.cases||[];d.grant=0;
+  d.inv={themes:['mint'],shield:0,bgs:[],...(d.inv||{})};if(!Array.isArray(d.inv.bgs))d.inv.bgs=[];d.anti=Array.isArray(d.anti)?d.anti:[];d.metrics=Array.isArray(d.metrics)?d.metrics:[];d.settings.bg=d.settings.bg||'none';d.profile={nick:'',ava:'',ava48:'',...(d.profile||{})};if(!d.profile.id)d.profile.id=uid()+uid();d.cards=Array.isArray(d.cards)?d.cards:[];d.friends=Array.isArray(d.friends)?d.friends:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.games=Array.isArray(d.games)?d.games:[];d.net={key:'',db:'',uid:'',refresh:'',idToken:'',exp:0,...(d.net||{})};if(!d.inv.themes.includes('mint'))d.inv.themes.unshift('mint');d.settings.testUnlock=false;if(!d.inv.themes.includes(d.settings.theme))d.settings.theme='mint';if(d.settings.bg!=='none'&&!d.inv.bgs.includes(d.settings.bg))d.settings.bg='none';
   return d;
 }
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
 if(!S||!Array.isArray(S.routines))S=seed((navigator.language||'ru').toLowerCase().startsWith('ru')?'ru':'en');
 normalize(S);save();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){if(TG&&CLOUD.ready){S.savedAt=Date.now();cloudSched()}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 let UI={bt:'hub',gbusy:false,gs:{crash:50,roul:50,bj:50},cr:{state:'idle',m:1,el:0,auto:2,useAuto:false,hist:[]},ro:{bet:'r',hist:[],last:null},bj:{state:'idle',p:[],d:[]},lb:{view:'all'},focusOpen:false,netErr:'',tab:'home',week:mondayOf(today()),tagF:[],sideView:'open',hl:null,sound:true,busy:false,lastDrop:null,u:{mode:'x',mult:2,stake:50,target:null,rot:180,spinning:false}};
 try{const u=JSON.parse(localStorage.getItem(KEY+'_ui'));if(u&&u.tab)UI.tab=u.tab;if(u&&u.sound===false)UI.sound=false}catch(e){}
 const saveUI=()=>{try{localStorage.setItem(KEY+'_ui',JSON.stringify({tab:UI.tab,sound:UI.sound,bt:UI.bt}))}catch(e){}};
@@ -1048,11 +1051,11 @@ function itemView(it){
 }
 const itemCard=it=>{const v=itemView(it);return`<div class="ci" style="--rc:${RAR[it.r].col}"><div class="ico">${v.ico}</div><div class="lab">${v.lab}</div></div>`};
 function bgChips(){
-  return`<div class="thg">${Object.entries(BGS).sort((a,b)=>RORD.indexOf(a[1].r)-RORD.indexOf(b[1].r)).map(([id,bg])=>{const own=id==='none'||S.inv.bgs.includes(id)||S.settings.testUnlock;
+  return`<div class="thg">${Object.entries(BGS).sort((a,b)=>RORD.indexOf(a[1].r)-RORD.indexOf(b[1].r)).map(([id,bg])=>{const own=id==='none'||S.inv.bgs.includes(id);
     return`<div class="th ${(S.settings.bg||'none')===id?'on':''} ${own?'':'lock'}" ${own?`data-act="setbg" data-id="${id}"`:''} title="${nm(RAR[bg.r].n)}"><span class="bgsw" style="background:${bg.css?bg.css+',':''}var(--bg)"></span>${nm(bg.n)}${own?'':' 🔒'}</div>`}).join('')}</div>`;
 }
 function themeChips(){
-  return`<div class="thg">${Object.entries(THEMES).sort((a,b)=>RORD.indexOf(a[1].r)-RORD.indexOf(b[1].r)).map(([id,th])=>{const own=S.inv.themes.includes(id)||S.settings.testUnlock;
+  return`<div class="thg">${Object.entries(THEMES).sort((a,b)=>RORD.indexOf(a[1].r)-RORD.indexOf(b[1].r)).map(([id,th])=>{const own=S.inv.themes.includes(id);
     return`<div class="th ${S.settings.theme===id?'on':''} ${own?'':'lock'}" ${own?`data-act="theme" data-id="${id}"`:''} title="${nm(RAR[th.r].n)}"><span class="sw" style="background:${th.acc}"></span>${nm(th.n)}${own?'':' 🔒'}</div>`}).join('')}</div>`;
 }
 function dropPanel(rec){
@@ -1448,37 +1451,58 @@ $('#focus').addEventListener('click',e=>{
 $('#focus').addEventListener('change',e=>{const el=e.target;if(el.dataset.f==='task'){S.timer=S.timer||{phase:'work',dur:S.settings.focusWork*60000,left:S.settings.focusWork*60000,running:false,count:0};S.timer.task=el.value;save()}
   if(el.dataset.f==='brk'){S.settings.focusBreak=Math.min(60,Math.max(1,Math.round(+el.value||5)));save();renderFocus()}});
 
-/* ---- онлайн: Firebase REST ---- */
-const NET=()=>({key:(ONLINE.apiKey||S.net.key||'').trim(),db:(ONLINE.databaseURL||S.net.db||'').trim().replace(/\/+$/,'')});
-const netOK=()=>{const n=NET();return!!n.key&&/^https:\/\/[a-z0-9.-]+\.(firebaseio\.com|firebasedatabase\.app)$/i.test(n.db)};
-async function fbToken(){
-  const {key}=NET(),N=S.net;
-  if(N.idToken&&Date.now()<N.exp-60000)return N.idToken;
-  let j;
-  if(N.refresh){const r=await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(key)}`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(N.refresh)});j=await r.json();
-    if(j.id_token){N.idToken=j.id_token;N.refresh=j.refresh_token;N.uid=j.user_id;N.exp=Date.now()+(+j.expires_in||3600)*1000;save();return N.idToken}}
-  const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(key)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({returnSecureToken:true})});j=await r.json();
-  if(!j.idToken)throw new Error(j.error&&j.error.message||'auth failed');
-  N.idToken=j.idToken;N.refresh=j.refreshToken;N.uid=j.localId;N.exp=Date.now()+(+j.expiresIn||3600)*1000;save();return N.idToken;
+/* ---- онлайн: Telegram + Supabase ---- */
+const netOK=()=>!!TG;
+async function api(action,body){
+  const r=await fetch(ONLINE.fn,{method:'POST',headers:{'Content-Type':'application/json',apikey:ONLINE.key},body:JSON.stringify({action,initData:TG.initData,...(body||{})})});
+  let j={};try{j=await r.json()}catch(e){}
+  if(!r.ok||j.error)throw new Error(j.error||j.message||('HTTP '+r.status));
+  return j;
 }
 let pushT=null,lastPush='';
-function payload(C){const L0=lvl(C.elo);return{nick:S.profile.nick.slice(0,20),ava:avaOK(S.profile.ava)?S.profile.ava:'',elo:C.elo,lvl:L0.n,peak:C.peak,season:C.sn,wins:C.season.wins,losses:C.season.losses,streak:C.streak,best:C.best,week:mondayOf(today()),weekDelta:C.weekDelta}}
-function schedulePush(C){if(!netOK()||!S.profile.nick.trim())return;const p=JSON.stringify(payload(C));if(p===lastPush)return;clearTimeout(pushT);pushT=setTimeout(()=>pushProfile(p),2500)}
+function payload(C){const L0=lvl(C.elo);const a=avaOK(S.profile.ava48)?S.profile.ava48:avaOK(S.profile.ava)?S.profile.ava:'';return{nick:S.profile.nick.slice(0,20),ava:a,elo:C.elo,lvl:L0.n,peak:C.peak,season:C.sn,wins:C.season.wins,losses:C.season.losses,streak:C.streak,best:C.best,week:mondayOf(today()),weekDelta:C.weekDelta}}
+function schedulePush(C){if(!netOK()||!CLOUD.ready||!S.profile.nick.trim())return;const p=JSON.stringify(payload(C));if(p===lastPush)return;clearTimeout(pushT);pushT=setTimeout(()=>pushProfile(p),2500)}
 async function pushProfile(p){
-  try{const tok=await fbToken();const body=JSON.parse(p);body.updated={'.sv':'timestamp'};
-    const r=await fetch(`${NET().db}/players/${S.net.uid}.json?auth=${encodeURIComponent(tok)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!r.ok)throw new Error('HTTP '+r.status+(r.status===401?' — '+L('проверь правила базы','check database rules'):''));
-    lastPush=p;UI.netErr='';
-  }catch(e){UI.netErr=String(e.message||e)}
+  try{await api('push',{p:JSON.parse(p)});lastPush=p;UI.netErr=''}
+  catch(e){UI.netErr=String(e.message||e)}
 }
 async function loadTop(force){
   if(!netOK()||UI.lb.loading)return;if(!force&&UI.lb.at&&Date.now()-UI.lb.at<30000)return;
   UI.lb.loading=true;
-  try{if(!S.net.uid)await fbToken();const r=await fetch(`${NET().db}/players.json`);if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json()||{};
-    UI.lb.data=Object.entries(j).map(([id,v])=>({id,...(v||{})})).filter(p=>p&&typeof p.nick==='string');UI.lb.at=Date.now();UI.lb.err=''}
+  try{const j=await api('top',{season:seasonOf(today())});UI.lb.data=(j.players||[]).filter(p=>p&&typeof p.nick==='string');UI.lb.at=Date.now();UI.lb.err=''}
   catch(e){UI.lb.err=String(e.message||e)}
   UI.lb.loading=false;if(UI.tab==='top')render();
 }
+/* облачное сохранение: прогресс живёт на сервере, можно заходить с телефона и ПК */
+function cloudSched(){clearTimeout(CLOUD.t);CLOUD.t=setTimeout(cloudSave,4000)}
+function adoptCloud(st,at){const uid=S.net.uid;S=normalize(st);S.net.uid=uid;S.savedAt=+at||0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}lastLvl=null;lastBonus=null}
+async function cloudSave(){
+  if(!TG||!CLOUD.ready)return;if(CLOUD.busy){cloudSched();return}
+  CLOUD.busy=true;clearTimeout(CLOUD.t);CLOUD.t=null;
+  try{if(!S.savedAt)S.savedAt=Date.now();const j=await api('save',{state:S,savedAt:S.savedAt});
+    if(j.conflict&&j.state){adoptCloud(j.state,j.saved_at);render();toast(L('☁️ Подтянул свежие данные с другого устройства','☁️ Pulled newer data from another device'))}
+    UI.netErr=''}
+  catch(e){UI.netErr=String(e.message||e)}
+  CLOUD.busy=false;
+}
+async function cloudBoot(){
+  if(!TG)return;
+  try{TG.ready();TG.expand();TG.setHeaderColor&&TG.setHeaderColor('#0c0d0f');TG.setBackgroundColor&&TG.setBackgroundColor('#0c0d0f')}catch(e){}
+  const u=TG.initDataUnsafe&&TG.initDataUnsafe.user;if(!u)return;
+  S.net.uid=String(u.id);
+  try{
+    const j=await api('load');
+    if(j.state&&(+j.saved_at||0)>(+S.savedAt||0)){adoptCloud(j.state,j.saved_at);toast(L('☁️ Прогресс загружен из облака','☁️ Progress loaded from the cloud'))}
+    if(!S.profile.nick.trim())S.profile.nick=String(u.first_name||u.username||'Player').slice(0,20);
+    const sp=TG.initDataUnsafe.start_param||'';
+    if(/^f\d+$/.test(sp)){const fid=sp.slice(1);if(fid!==S.net.uid&&!S.friends.includes(fid)){S.friends.push(fid);toast(L('🤝 Друг добавлен','🤝 Friend added'))}}
+    CLOUD.ready=true;UI.netErr='';
+    if(!j.state||(+S.savedAt||0)>=(+j.saved_at||0)){S.savedAt=S.savedAt||Date.now();save();cloudSave()}else save();
+  }catch(e){UI.netErr=String(e.message||e);setTimeout(cloudBoot,30000)}
+  render();
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&CLOUD.t)cloudSave()});
+function inviteLink(){return`https://t.me/${ONLINE.bot}?startapp=f${S.net.uid}`}
 const RULES=`{
   "rules": {
     "players": {
@@ -1667,24 +1691,14 @@ function vSettings(){
       <div class="fld"><label>${L('Дата старта сезона','Season start date')}</label><input type="date" value="${S.start}" data-chg="start"></div>
     </div>
     <div class="card"><h3>${L('Категории','Categories')}</h3>${S.cats.map(c=>`<div class="catrow"><input type="color" value="${c.color}" data-chg="ccol" data-id="${c.id}"><input type="text" value="${esc(c.name)}" data-chg="cname" data-id="${c.id}"><button class="ib" data-act="cdel" data-id="${c.id}">✕</button></div>`).join('')}<button class="btn" data-act="cadd">${L('+ Категория','+ Category')}</button></div>
-    <div class="card" style="grid-column:span 2"><h3>${L('Тема оформления','Theme')}</h3>${themeChips()}<h3 style="margin-top:16px">${L('Фон / узор','Background / pattern')}</h3>${bgChips()}<div class="row" style="margin-top:14px"><span class="chip ${S.settings.testUnlock?'on':''}" data-act="testunlock">🧪 ${L('Открыть всё для теста','Unlock all for testing')}</span><span style="font-size:12px;color:var(--muted)">${L('Темы и фоны выпадают из кейсов «Темы» и «Фоны». Тест-режим открывает всё только для примерки.','Themes and backgrounds drop from the Themes and Backgrounds cases. Test mode unlocks everything just to try on.')}</span></div></div>
+    <div class="card" style="grid-column:span 2"><h3>${L('Тема оформления','Theme')}</h3>${themeChips()}<h3 style="margin-top:16px">${L('Фон / узор','Background / pattern')}</h3>${bgChips()}<div class="row" style="margin-top:14px"><span style="font-size:12px;color:var(--muted)">${L('Темы и фоны выпадают из кейсов «Темы» и «Фоны».','Themes and backgrounds drop from the Themes and Backgrounds cases.')}</span></div></div>
     <div class="card"><h3>${L('Данные','Data')}</h3>
       <div class="row" style="flex-direction:column;align-items:stretch">
         <button class="btn pri" data-act="export">⬇ ${L('Экспорт в файл','Export to file')}</button>
         <button class="btn" data-act="import">⬆ ${L('Импорт из файла','Import from file')}</button>
         <button class="btn danger" data-act="reset" style="margin-top:16px">${L('Сбросить всё','Reset everything')}</button>
       </div></div>
-    <div class="card"><h3>🌍 ${L('Онлайн-топ','Online board')}</h3>${netOK()?`<div style="color:var(--win);font-weight:700">● ${L('Подключено','Connected')}</div>${ONLINE.databaseURL?'':`<button class="btn ghost" data-act="netoff" style="margin-top:10px">${L('Отключить','Disconnect')}</button>`}`:`<div style="color:var(--muted);font-size:13px">${L('Пока работает без сервера: друзья — через карточки во вкладке «Топ». Живой онлайн подключим позже.','Works without a server for now: friends via cards in the Top tab. Live online comes later.')}</div>
-      <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--dim);font-size:12px">${L('Для потом: Firebase','For later: Firebase')}</summary>
-      <div class="fld" style="margin-top:10px"><label>Web API Key</label><input type="text" value="${esc(S.net.key)}" data-chg="netkey"></div>
-      <div class="fld" style="margin-top:8px"><label>Database URL</label><input type="text" value="${esc(S.net.db)}" data-chg="netdb"></div>
-      <pre class="rules" style="margin-top:8px">${esc(RULES)}</pre></details>`}</div>
-    <div class="card" style="border-style:dashed"><h3>🧪 ${L('Тест-режим','Test mode')}</h3>
-      <p style="font-size:12px;color:var(--muted);margin:0 0 10px">${L('Выдать себе монеты. Они идут в копилку, но не в «заработано».','Give yourself coins. They go to the balance, not to "earned".')}</p>
-      <div class="row"><input type="number" id="grantAmt" value="1000" style="width:110px">${[500,1000,5000].map(v=>`<button class="btn" data-act="grant" data-d="${v}">+${v}</button>`).join('')}</div>
-      <div class="row" style="margin-top:8px"><button class="btn pri" data-act="grant" data-d="input">${L('Выдать','Give')}</button><button class="btn ghost" data-act="grant0">${L('Обнулить выданное','Reset granted')}</button></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:10px">${L('Сейчас выдано','Granted')}: <b class="mono">◈ ${num(S.grant)}</b></div>
-    </div>
+    <div class="card"><h3>🌍 ${L('Онлайн-топ','Online board')}</h3>${netOK()?`<div style="color:var(--win);font-weight:700">● ${L('Подключено через Telegram','Connected via Telegram')}</div><div style="font-size:12px;color:var(--muted);margin-top:6px">${L('Прогресс сохраняется в облаке — можно заходить с телефона и ПК.','Progress is saved in the cloud — use it on phone and PC.')}</div>${UI.netErr?`<div style="font-size:12px;color:var(--loss);margin-top:6px">${esc(UI.netErr)}</div>`:''}<button class="btn" data-act="invite" style="margin-top:10px">🤝 ${L('Пригласить друга','Invite a friend')}</button>`:`<div style="color:var(--muted);font-size:13px">${L('Для онлайн-топа и облачного сохранения открой VOZDUH через бота','For the online board and cloud save, open VOZDUH via the bot')} <a href="https://t.me/${ONLINE.bot}" target="_blank" style="color:var(--gold)">@${ONLINE.bot}</a>.</div>`}</div>
   </div>`;
 }
 
@@ -1825,11 +1839,11 @@ const A={
   lang:(_,d)=>{S.settings.lang=d},
   cur:(_,d)=>{const c=CURS[+d];S.settings.cur=c[0];S.settings.curPos=c[1];SND.tick()},
   curcustom:()=>{setTimeout(()=>{const i=document.querySelector('[data-chg=cursym]');i&&(i.focus(),i.select())},30);return'skip'},
-  grant:(_,d)=>{const v=d==='input'?+String($('#grantAmt').value).replace(',','.'):+d;if(!v)return'skip';S.grant=(+S.grant||0)+v;SND.win();FX.fireworks(2);toast(`🧪 ${v>0?'+':''}${v} V`)},
-  grant0:()=>{S.grant=0;SND.undo()},
+  grant:()=>'skip',
+  grant0:()=>'skip',
   report:(_,d)=>{showReport(d);return'skip'},
-  setbg:id=>{if(!(id==='none'||S.inv.bgs.includes(id)||S.settings.testUnlock))return'skip';S.settings.bg=id;SND.chime()},
-  testunlock:()=>{S.settings.testUnlock=!S.settings.testUnlock;if(!S.settings.testUnlock){if(!S.inv.themes.includes(S.settings.theme))S.settings.theme='mint';if(S.settings.bg!=='none'&&!S.inv.bgs.includes(S.settings.bg))S.settings.bg='none'}SND.tick()},
+  setbg:id=>{if(!(id==='none'||S.inv.bgs.includes(id)))return'skip';S.settings.bg=id;SND.chime()},
+  testunlock:()=>'skip',
   mday:(_,d)=>{UI.mday=d},
   madd:()=>{metricModal();return'skip'},
   mtpl:(_,d)=>{metricModal(null,MTPL()[+d]);return'skip'},
@@ -1862,6 +1876,7 @@ const A={
   ava:()=>{$('#avaFile').click();return'skip'},
   copycode:()=>{const c=S.net.uid;try{navigator.clipboard.writeText(c).then(()=>toast(L('Код скопирован','Code copied')),()=>toast(c))}catch(e){toast(c)}return'skip'},
   lbview:(_,d)=>{UI.lb.view=d},
+  invite:()=>{const link=inviteLink();if(TG&&TG.openTelegramLink){TG.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent(L('Го соревноваться в VOZDUH 💨','Compete with me in VOZDUH 💨')))}else{try{navigator.clipboard.writeText(link).then(()=>toast(L('Ссылка скопирована','Link copied')),()=>toast(link))}catch(e){toast(link)}}return'skip'},
   lbref:()=>{UI.lb.at=0;loadTop(true);SND.tick()},
   friend:id=>{if(!S.friends.includes(id))S.friends.push(id);SND.pop();toast(L('🤝 Добавлен в друзья','🤝 Friend added'))},
   unfriend:id=>{S.friends=S.friends.filter(x=>x!==id);SND.undo()},
@@ -1940,6 +1955,7 @@ if(IMG.bj_table)document.head.insertAdjacentHTML('beforeend',`<style>.felt{backg
 if(IMG.crash_bg)document.head.insertAdjacentHTML('beforeend',`<style>.crwrap{background:linear-gradient(rgba(8,10,12,.35),rgba(8,10,12,.55)),url(${IMG.crash_bg}) center/cover!important}</style>`);
 let curDay=today();setInterval(()=>{if(today()!==curDay&&!UI.busy&&!UI.u.spinning){curDay=today();UI.reportChecked=false;render()}else if(wd(today())===7&&new Date().getHours()>=18&&S.reportSeen!==mondayOf(today())&&$('#modal').classList.contains('hidden')){S.reportSeen=mondayOf(today());save();showReport(S.reportSeen)}},60000);
 render();
+cloudBoot();
 </script>
 </body>
 </html>
