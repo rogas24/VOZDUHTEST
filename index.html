@@ -425,9 +425,11 @@ const money=n=>{const s=S.settings.cur||'₽';return S.settings.curPos==='before
 /* ============ ОНЛАЙН (топ и друзья) ============
    Впиши сюда данные своего Firebase один раз — и у всех, кто открывает твою страницу,
    будет общий топ. Или оставь пустым и введи их в Настройках (тогда только у тебя). */
-const ONLINE={fn:'https://bpsgmrhlksiijodnbtqq.supabase.co/functions/v1/vozduh',key:'sb_publishable_Wie5BO9uNd3p4iOwustMXA_RX0RJPcr',bot:'vozduhgamebot'};
+const ONLINE={fn:'https://bpsgmrhlksiijodnbtqq.supabase.co/rest/v1/rpc/vozduh',key:'sb_publishable_Wie5BO9uNd3p4iOwustMXA_RX0RJPcr',bot:'vozduhgamebot'};
 const TG=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)?Telegram.WebApp:null;
 var CLOUD={ready:false,t:null,busy:false};
+let LOGIN=null;if(!TG){try{const l=JSON.parse(localStorage.getItem('vozduh_tglogin'));if(l&&l.id&&l.hash&&Date.now()/1000-(+l.auth_date||0)<29*86400)LOGIN=l}catch(e){}}
+const ONL=()=>!!(TG||LOGIN);
 
 /* ============ сезоны ============ */
 const SEASON_EPOCH='2026-11-01',SEASON_MONTHS=2;
@@ -554,7 +556,7 @@ let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
 if(!S||!Array.isArray(S.routines))S=seed((navigator.language||'ru').toLowerCase().startsWith('ru')?'ru':'en');
 normalize(S);save();
-function save(){if(TG&&CLOUD.ready){S.savedAt=Date.now();cloudSched()}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){if(ONL()&&CLOUD.ready){S.savedAt=Date.now();cloudSched()}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 let UI={bt:'hub',gbusy:false,gs:{crash:50,roul:50,bj:50},cr:{state:'idle',m:1,el:0,auto:2,useAuto:false,hist:[]},ro:{bet:'r',hist:[],last:null},bj:{state:'idle',p:[],d:[]},lb:{view:'all'},focusOpen:false,netErr:'',tab:'home',week:mondayOf(today()),tagF:[],sideView:'open',hl:null,sound:true,busy:false,lastDrop:null,u:{mode:'x',mult:2,stake:50,target:null,rot:180,spinning:false}};
 try{const u=JSON.parse(localStorage.getItem(KEY+'_ui'));if(u&&u.tab)UI.tab=u.tab;if(u&&u.sound===false)UI.sound=false}catch(e){}
 const saveUI=()=>{try{localStorage.setItem(KEY+'_ui',JSON.stringify({tab:UI.tab,sound:UI.sound,bt:UI.bt}))}catch(e){}};
@@ -726,7 +728,7 @@ function render(){
   $('#hud').innerHTML=`<div class="lv" data-tab="profile">${avaHTML(S.profile.ava,S.profile.nick||'V',34)}${badge(C.elo,40)}<div><div class="elo mono">${C.elo}</div><small>${toNext}</small></div></div>${live}<div class="coins" data-tab="shop"><b>◈</b><span class="mono">${num(C.balance)}</span></div><button class="ib langb" data-lang>${EN()?'RU':'EN'}</button><button class="ib snd" data-snd>${ic(UI.sound?'ui_sound_on':'ui_sound_off',24)||(UI.sound?'🔊':'🔇')}</button>`;
   const v={week:vWeek,routine:vRoutine,disc:vDisc,quests:vQuests,shop:vShop,burm:vBurm,profile:vProfile,settings:vSettings,top:vTop,home:vHome}[UI.tab]||vHome;
   $('#app').innerHTML=v(C);
-  renderFocus();coinify($('#app'));coinify($('#hud'));coinify($('#focus'));schedulePush(C);postBurm();
+  renderFocus();coinify($('#app'));coinify($('#hud'));coinify($('#focus'));schedulePush(C);postBurm();mountLogin();
 }
 function matchPill(m,d){
   if(!m)return d>today()?'':`<span class="pill">${L('нет дел','no tasks')}</span>`;
@@ -1452,10 +1454,11 @@ $('#focus').addEventListener('change',e=>{const el=e.target;if(el.dataset.f==='t
   if(el.dataset.f==='brk'){S.settings.focusBreak=Math.min(60,Math.max(1,Math.round(+el.value||5)));save();renderFocus()}});
 
 /* ---- онлайн: Telegram + Supabase ---- */
-const netOK=()=>!!TG;
+const netOK=()=>ONL();
 async function api(action,body){
-  const r=await fetch(ONLINE.fn,{method:'POST',headers:{'Content-Type':'application/json',apikey:ONLINE.key},body:JSON.stringify({action,initData:TG.initData,...(body||{})})});
+  const r=await fetch(ONLINE.fn,{method:'POST',headers:{'Content-Type':'application/json',apikey:ONLINE.key},body:JSON.stringify({payload:{action,...(TG?{initData:TG.initData}:{login:LOGIN}),...(body||{})}})});
   let j={};try{j=await r.json()}catch(e){}
+  if(r.status===401&&LOGIN&&!TG){tgLogout(true);throw new Error(L('Сессия истекла — войди через Telegram заново','Session expired — log in with Telegram again'))}
   if(!r.ok||j.error)throw new Error(j.error||j.message||('HTTP '+r.status));
   return j;
 }
@@ -1477,7 +1480,7 @@ async function loadTop(force){
 function cloudSched(){clearTimeout(CLOUD.t);CLOUD.t=setTimeout(cloudSave,4000)}
 function adoptCloud(st,at){const uid=S.net.uid;S=normalize(st);S.net.uid=uid;S.savedAt=+at||0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}lastLvl=null;lastBonus=null}
 async function cloudSave(){
-  if(!TG||!CLOUD.ready)return;if(CLOUD.busy){cloudSched();return}
+  if(!ONL()||!CLOUD.ready)return;if(CLOUD.busy){cloudSched();return}
   CLOUD.busy=true;clearTimeout(CLOUD.t);CLOUD.t=null;
   try{if(!S.savedAt)S.savedAt=Date.now();const j=await api('save',{state:S,savedAt:S.savedAt});
     if(j.conflict&&j.state){adoptCloud(j.state,j.saved_at);render();toast(L('☁️ Подтянул свежие данные с другого устройства','☁️ Pulled newer data from another device'))}
@@ -1486,21 +1489,26 @@ async function cloudSave(){
   CLOUD.busy=false;
 }
 async function cloudBoot(){
-  if(!TG)return;
-  try{TG.ready();TG.expand();TG.setHeaderColor&&TG.setHeaderColor('#0c0d0f');TG.setBackgroundColor&&TG.setBackgroundColor('#0c0d0f')}catch(e){}
-  const u=TG.initDataUnsafe&&TG.initDataUnsafe.user;if(!u)return;
+  if(!ONL())return;
+  if(TG)try{TG.ready();TG.expand();TG.setHeaderColor&&TG.setHeaderColor('#0c0d0f');TG.setBackgroundColor&&TG.setBackgroundColor('#0c0d0f')}catch(e){}
+  const u=TG?(TG.initDataUnsafe&&TG.initDataUnsafe.user):LOGIN;if(!u)return;
   S.net.uid=String(u.id);
   try{
     const j=await api('load');
     if(j.state&&(+j.saved_at||0)>(+S.savedAt||0)){adoptCloud(j.state,j.saved_at);toast(L('☁️ Прогресс загружен из облака','☁️ Progress loaded from the cloud'))}
     if(!S.profile.nick.trim())S.profile.nick=String(u.first_name||u.username||'Player').slice(0,20);
-    const sp=TG.initDataUnsafe.start_param||'';
+    const sp=TG?(TG.initDataUnsafe.start_param||''):'';
     if(/^f\d+$/.test(sp)){const fid=sp.slice(1);if(fid!==S.net.uid&&!S.friends.includes(fid)){S.friends.push(fid);toast(L('🤝 Друг добавлен','🤝 Friend added'))}}
     CLOUD.ready=true;UI.netErr='';
     if(!j.state||(+S.savedAt||0)>=(+j.saved_at||0)){S.savedAt=S.savedAt||Date.now();save();cloudSave()}else save();
-  }catch(e){UI.netErr=String(e.message||e);setTimeout(cloudBoot,30000)}
+  }catch(e){UI.netErr=String(e.message||e);if(ONL())setTimeout(cloudBoot,30000)}
   render();
 }
+/* вход на сайте через Telegram — тот же аккаунт и прогресс, что в боте */
+window.onTgAuth=function(user){if(!user||!user.hash)return;LOGIN=user;try{localStorage.setItem('vozduh_tglogin',JSON.stringify(user))}catch(e){}CLOUD.ready=false;UI.lb={view:'all'};toast(L('✅ Вошёл через Telegram','✅ Logged in with Telegram'));cloudBoot()};
+function tgLogout(silent){if(CLOUD.t){clearTimeout(CLOUD.t);CLOUD.t=null}LOGIN=null;CLOUD.ready=false;try{localStorage.removeItem('vozduh_tglogin')}catch(e){}UI.lb={view:'all'};if(!silent)render()}
+function loginBox(){if(TG||LOGIN)return'';return`<div class="card" style="margin-bottom:14px;border-color:var(--gold)"><h3>🔐 ${L('Синхронизация с ботом','Sync with the bot')}</h3><p style="font-size:13px;color:var(--muted);margin:0 0 10px">${L('Войди через Telegram — подтянется тот же прогресс, что в боте @','Log in with Telegram to get the same progress as in the bot @')}${ONLINE.bot}${L(', и откроется онлайн-топ.',', plus the online board.')}</p><div class="tglogin"></div></div>`}
+function mountLogin(){if(TG||LOGIN)return;document.querySelectorAll('.tglogin').forEach(el=>{if(el.dataset.m)return;el.dataset.m=1;const sc=document.createElement('script');sc.async=true;sc.src='https://telegram.org/js/telegram-widget.js?22';sc.setAttribute('data-telegram-login',ONLINE.bot);sc.setAttribute('data-size','large');sc.setAttribute('data-radius','10');sc.setAttribute('data-onauth','onTgAuth(user)');el.appendChild(sc)})}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&CLOUD.t)cloudSave()});
 function inviteLink(){return`https://t.me/${ONLINE.bot}?startapp=f${S.net.uid}`}
 const RULES=`{
@@ -1515,7 +1523,7 @@ const RULES=`{
   }
 }`;
 function vTop(C){
-  if(!netOK())return vTopOffline(C);
+  if(!netOK())return loginBox()+vTopOffline(C);
   if(false){
     return`<h2>${L('Топ игроков и друзья','Leaderboard & friends')}</h2><p class="sub">${L('Для общего топа нужна бесплатная база Firebase — настраивается один раз, минуты за 3.','A shared leaderboard needs a free Firebase database — one-time setup, about 3 minutes.')}</p>
     <div class="grid2"><div class="card"><h3>${L('Как подключить','How to connect')}</h3><ol class="steps">
@@ -1698,7 +1706,7 @@ function vSettings(){
         <button class="btn" data-act="import">⬆ ${L('Импорт из файла','Import from file')}</button>
         <button class="btn danger" data-act="reset" style="margin-top:16px">${L('Сбросить всё','Reset everything')}</button>
       </div></div>
-    <div class="card"><h3>🌍 ${L('Онлайн-топ','Online board')}</h3>${netOK()?`<div style="color:var(--win);font-weight:700">● ${L('Подключено через Telegram','Connected via Telegram')}</div><div style="font-size:12px;color:var(--muted);margin-top:6px">${L('Прогресс сохраняется в облаке — можно заходить с телефона и ПК.','Progress is saved in the cloud — use it on phone and PC.')}</div>${UI.netErr?`<div style="font-size:12px;color:var(--loss);margin-top:6px">${esc(UI.netErr)}</div>`:''}<button class="btn" data-act="invite" style="margin-top:10px">🤝 ${L('Пригласить друга','Invite a friend')}</button>`:`<div style="color:var(--muted);font-size:13px">${L('Для онлайн-топа и облачного сохранения открой VOZDUH через бота','For the online board and cloud save, open VOZDUH via the bot')} <a href="https://t.me/${ONLINE.bot}" target="_blank" style="color:var(--gold)">@${ONLINE.bot}</a>.</div>`}</div>
+    <div class="card"><h3>🌍 ${L('Онлайн-топ','Online board')}</h3>${netOK()?`<div style="color:var(--win);font-weight:700">● ${L('Подключено через Telegram','Connected via Telegram')}</div><div style="font-size:12px;color:var(--muted);margin-top:6px">${L('Прогресс сохраняется в облаке — можно заходить с телефона и ПК.','Progress is saved in the cloud — use it on phone and PC.')}</div>${UI.netErr?`<div style="font-size:12px;color:var(--loss);margin-top:6px">${esc(UI.netErr)}</div>`:''}<button class="btn" data-act="invite" style="margin-top:10px">🤝 ${L('Пригласить друга','Invite a friend')}</button>${TG?'':`<button class="btn ghost" data-act="tglogout" style="margin-top:10px;margin-left:6px">${L('Выйти','Log out')}</button>`}`:`${loginBox().replace('margin-bottom:14px;','')}`}</div>
   </div>`;
 }
 
@@ -1876,6 +1884,7 @@ const A={
   ava:()=>{$('#avaFile').click();return'skip'},
   copycode:()=>{const c=S.net.uid;try{navigator.clipboard.writeText(c).then(()=>toast(L('Код скопирован','Code copied')),()=>toast(c))}catch(e){toast(c)}return'skip'},
   lbview:(_,d)=>{UI.lb.view=d},
+  tglogout:()=>{tgLogout()},
   invite:()=>{const link=inviteLink();if(TG&&TG.openTelegramLink){TG.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent(L('Го соревноваться в VOZDUH 💨','Compete with me in VOZDUH 💨')))}else{try{navigator.clipboard.writeText(link).then(()=>toast(L('Ссылка скопирована','Link copied')),()=>toast(link))}catch(e){toast(link)}}return'skip'},
   lbref:()=>{UI.lb.at=0;loadTop(true);SND.tick()},
   friend:id=>{if(!S.friends.includes(id))S.friends.push(id);SND.pop();toast(L('🤝 Добавлен в друзья','🤝 Friend added'))},
