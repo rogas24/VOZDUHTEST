@@ -399,6 +399,14 @@ html.light .pm{background:linear-gradient(180deg,#fff6d6,var(--panel) 38%)}
 .lbet .ln{display:flex;align-items:center;gap:6px}.lbet .ln i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .rball{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-size:34px;font-weight:800;color:#fff;animation:rpop .4s ease-out}
 .rball.r{background:linear-gradient(180deg,#f0525a,#b8262f)}.rball.b{background:linear-gradient(180deg,#3a3e46,#1d2026)}.rball.g{background:linear-gradient(180deg,#43e08a,#1c9c55)}
+.rball.spin{animation:rpulse .28s ease-in-out infinite alternate;opacity:.95}@keyframes rpulse{from{transform:scale(.9)}to{transform:scale(1.08)}}
+.lcstage{position:relative;width:100%;height:100%;min-height:220px;overflow:hidden;border-radius:12px}
+.lctrack{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 36px,color-mix(in srgb,var(--line) 55%,transparent) 36px 37px)}
+.lrkt{position:absolute;left:50%;transform:translateX(-50%);font-size:40px;transition:bottom .12s linear;z-index:2;filter:drop-shadow(0 4px 10px rgba(0,0,0,.45))}
+.lcstage.boom .lrkt{font-size:52px;transition:none}
+.lcm2{position:absolute;top:12px;left:0;right:0;z-index:3}
+.lcov{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:var(--muted);font-size:13px;font-weight:600;z-index:3}
+.lbet .ln .ava{flex:0 0 auto}
 @keyframes rpop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 .hc{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;font-size:12px;font-weight:700;color:#fff}
 .hc.r{background:#b8262f}.hc.b{background:#2a2e35}.hc.g{background:#1c9c55}
@@ -576,7 +584,10 @@ const TG=(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)?Telegram.W
 var CLOUD={ready:false,t:null,busy:false,rev:null};
 /* одинаковые правила для всех + лимиты, чтобы нельзя было нафармить */
 const FIXED={win:60,mainElo:80,sideElo:15,eloTask:3,eloRoutine:2,eloStep:5,perfectBonus:25,eloStart:1000,streakMult:true,relapsePen:10,focusRate:1};
-const CAPS={eloCat:20,eloDay:60,eloQuest:100,coinCat:150,coinDay:500,coinQuest:500,coinBonus:200};
+const CAPS={eloCat:20,eloDay:50,eloQuest:60,coinCat:60,coinDay:200,coinQuest:200,coinBonus:100};
+const DECAY_DEF=4;
+const ITEMMAX={task:40,routine:40,quest:200,side:200,bonus7:100};
+const SEASON_ELO_MAX_DEF=4000;
 let LASTC=null;
 let ADM={admin:false,banned:false,ann:'',adj:[],luck:{add:0,phase:null},prem:null,premR:[],aw:[],dm:false,plans:{7:7,30:67,90:179,365:599},trialOk:false,channel:'vozduhgame'};try{const a=JSON.parse(localStorage.getItem('vozduh_adm'));if(a)ADM={...ADM,...a}}catch(e){}
 let CFG={};try{CFG=JSON.parse(localStorage.getItem('vozduh_cfg'))||{}}catch(e){CFG={}}
@@ -704,7 +715,6 @@ const frameOwned=id=>id==='none'||(S.inv.frames||[]).includes(id)||(FRAMES[id]&&
 function avaF(a,nick,size,fid,prem){const f=FRAMES[fid];const inner=avaHTML(a,nick,f&&f.grad?size-6:size);
   if(f&&f.grad)return`<span class="avf" style="background:${f.grad};padding:3px">${inner}</span>`;
   if(f&&f.ring)return`<span class="avf" style="box-shadow:${f.ring}">${inner}</span>`;
-  if(prem)return`<span class="avf" style="box-shadow:0 0 0 3px #ffc800,0 0 14px #ffc80066">${inner}</span>`;
   return inner}
 function avaHTML(a,nick,size){return avaOK(a)?`<img class="ava" src="${a}" style="width:${size}px;height:${size}px" alt="">`:`<span class="ava" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.42)}px">${esc((String(nick||'?').trim().charAt(0)||'?').toUpperCase())}</span>`}
 
@@ -832,7 +842,11 @@ function normalize(d){
   d.inv={themes:['mint'],shield:0,bgs:[],...(d.inv||{})};if(!Array.isArray(d.inv.bgs))d.inv.bgs=[];d.anti=Array.isArray(d.anti)?d.anti:[];d.metrics=Array.isArray(d.metrics)?d.metrics:[];d.settings.bg=d.settings.bg||'none';d.profile={nick:'',ava:'',ava48:'',...(d.profile||{})};if(!d.profile.id)d.profile.id=uid()+uid();d.cards=Array.isArray(d.cards)?d.cards:[];d.friends=Array.isArray(d.friends)?d.friends:[];d.focus=Array.isArray(d.focus)?d.focus:[];d.games=Array.isArray(d.games)?d.games:[];d.net={key:'',db:'',uid:'',refresh:'',idToken:'',exp:0,...(d.net||{})};if(!d.inv.themes.includes('mint'))d.inv.themes.unshift('mint');d.settings.testUnlock=false;Object.assign(d.settings,FIXED);d.cats=catList(d.settings.lang);
   const fc=x=>{if(x&&x.cat!==undefined&&x.cat!==''&&!CATIDS.has(x.cat))x.cat='other'};(d.tasks||[]).forEach(fc);(d.routines||[]).forEach(fc);(d.quests||[]).forEach(fc);(d.rewards||[]).forEach(fc);
   d.metrics.forEach(m=>{if(!m.key){const tt=String(m.title).trim().toLowerCase();const k=Object.keys(MALT).find(k=>MALT[k].includes(tt));if(k)m.key=k}mFix(m)});
-  d.anti.forEach(a=>{a.coinsPer=AREW.coins;a.eloPer=AREW.elo});d.voids=Array.isArray(d.voids)?d.voids:[];d.goals=Array.isArray(d.goals)?d.goals:[];d.inv.frames=Array.isArray(d.inv.frames)?d.inv.frames:[];if(d.profile.frame&&!FRAMES[d.profile.frame])d.profile.frame='';if(d.onb==null&&(Object.keys(d.rlog||{}).length||(d.tasks||[]).some(x=>x.done)))d.onb=true;{const th=THEMES[d.settings.theme]||{};if(!d.inv.themes.includes(d.settings.theme)&&!(th.prem&&isPrem())&&!(th.award&&hasAward()))d.settings.theme='mint'}{const bg=BGS[d.settings.bg]||{};if(d.settings.bg!=='none'&&!d.inv.bgs.includes(d.settings.bg)&&!(bg.prem&&isPrem()))d.settings.bg='none'}
+  d.anti.forEach(a=>{a.coinsPer=AREW.coins;a.eloPer=AREW.elo});
+  (d.tasks||[]).forEach(x=>{x.coins=Math.max(0,Math.min(ITEMMAX.task,+x.coins||0))});
+  (d.routines||[]).forEach(r=>{r.coins=Math.max(0,Math.min(ITEMMAX.routine,+r.coins||0));if(r.bonus7!=null)r.bonus7=Math.max(0,Math.min(ITEMMAX.bonus7,+r.bonus7||0))});
+  (d.quests||[]).forEach(q=>{q.coins=Math.max(0,Math.min(ITEMMAX.quest,+q.coins||0))});
+  (d.sides||[]).forEach(q=>{q.coins=Math.max(0,Math.min(ITEMMAX.side,+q.coins||0))});d.voids=Array.isArray(d.voids)?d.voids:[];d.goals=Array.isArray(d.goals)?d.goals:[];d.inv.frames=Array.isArray(d.inv.frames)?d.inv.frames:[];if(d.profile.frame&&!FRAMES[d.profile.frame])d.profile.frame='';if(d.onb==null&&(Object.keys(d.rlog||{}).length||(d.tasks||[]).some(x=>x.done)))d.onb=true;{const th=THEMES[d.settings.theme]||{};if(!d.inv.themes.includes(d.settings.theme)&&!(th.prem&&isPrem())&&!(th.award&&hasAward()))d.settings.theme='mint'}{const bg=BGS[d.settings.bg]||{};if(d.settings.bg!=='none'&&!d.inv.bgs.includes(d.settings.bg)&&!(bg.prem&&isPrem()))d.settings.bg='none'}
   return d;
 }
 let S=null;
@@ -937,6 +951,8 @@ function compute(){
       const full=m.win?Math.round((m.delta*mult+(ratio>=1?PB*mult:0))*pf):Math.round(m.delta*pf);
       if(!m.live){m.dElo=full;elo+=full;ss.matches++;if(m.win){ss.wins++;ss.cur++;ss.best=Math.max(ss.best,ss.cur)}else{ss.losses++;const mo=d.slice(0,7);if(ss.cur>0&&premAt(d)&&(FRZ[mo]||0)<2){FRZ[mo]=(FRZ[mo]||0)+1;m.frozen=true}else ss.cur=0}}else m.proj=full}
     const gain=Math.round((itemVal(d)+Math.min(CAPS.eloQuest,bonus[d]||0))*mult);elo+=gain+(adjE[d]||0);
+    {const ELMAX=(S.settings.eloStart||1000)+cfgN('seasonEloMax',SEASON_ELO_MAX_DEF);if(elo>ELMAX)elo=ELMAX}
+    if(d<t&&!C.matches[d]&&gain===0&&!(adjE[d]||0))elo=Math.max(E0,elo-cfgN('decayDay',DECAY_DEF));
     if(d===t){C.todayItems=gain;C.mult=mult}
     elo=Math.max(100,elo);ss.peak=Math.max(ss.peak,elo);ss.elo=elo;peakAll=Math.max(peakAll,elo);ss.earned+=C.coinsByDay[d]||0;
     C.series.push({d,elo,s});
@@ -1499,6 +1515,7 @@ function dropPanel(rec){
   else if(it.t==='theme')desc=rec.dupe?L(`Уже есть — компенсация ◈ ${rec.coins}`,`Already owned — refund ◈ ${rec.coins}`):`<button class="btn pri" data-act="theme" data-id="${it.id}">${L('Применить тему','Apply theme')}</button>`;
   else if(it.t==='bg')desc=rec.dupe?L(`Уже есть — компенсация ◈ ${rec.coins}`,`Already owned — refund ◈ ${rec.coins}`):`<button class="btn pri" data-act="setbg" data-id="${it.id}">${L('Поставить фон','Apply background')}</button>`;
   else if(it.t==='ch')desc=`<b>${esc(rec.ch)}</b><div style="color:var(--muted);font-size:12px;margin-top:4px">${L(`Добавлено в приключения · ${rec.chCoins} V за выполнение`,`Added to adventures · ${rec.chCoins} V reward`)}</div>`;
+  else if(it.t==='frame')desc=rec.dupe?L(`Уже есть — компенсация ◈ ${rec.coins}`,`Already owned — refund ◈ ${rec.coins}`):`<button class="btn pri" data-act="setframe" data-id="${it.id}">${L('Поставить рамку','Apply frame')}</button>`;
   else desc=L('Следующий слив в апгрейде вернёт 50% ставки','Your next upgrade loss refunds 50%');
   return`<div class="drop" style="--rc:${rr.col}">${itemCard(it)}<div><div class="rar" style="color:${rr.col}">${nm(rr.n)}</div><div style="font-size:22px;font-weight:800;margin:4px 0 8px">${v.lab}</div><div>${desc}</div></div><span class="sp"></span><button class="ib" data-act="dropclose">✕</button></div>`;
 }
@@ -1607,7 +1624,7 @@ function vHome(C){
   ${homeToday(C)}
   <div class="qlinks">${[['report','📊',L('Отчёт недели','Week report')],['quests','📜',L('Квесты','Quests')+(open.length?` · ${open.length}`:'')],['shop','🛍',L('Магазин','Shop')],...(burmShown()?[['burm:hub','🎰',L('Бурмалда','Burmalda')]]:[])].map(([g,i,n])=>`<span class="chip" data-act="go" data-d="${g}">${i} ${n}</span>`).join('')}</div></div>`;
 }
-function postBurm(){if(UI.tab!=='burm')return;if(UI.bt==='crash')drawCrash();if(UI.bt==='roul'&&!UI.ro.spinning)posRoul()}
+function postBurm(){if(UI.tab!=='burm')return;if(LIVE.on){if(UI.bt==='roul'&&LIVE.phase==='end')liveRoulLand(false);return}if(UI.bt==='crash')drawCrash();if(UI.bt==='roul'&&!UI.ro.spinning)posRoul()}
 
 /* ---- скрытая удача: продуктивность + фазы + серии ---- */
 const PHN=()=>({cold:L('🥶 Холодная','🥶 Cold'),warm:L('🌤 Тёплая','🌤 Warm'),hot:L('🔥 Горячая','🔥 Hot')});
@@ -1646,22 +1663,24 @@ const CK=.00012;
 function crashPoint(f){const u=Math.random(),x=Math.max(1,.96/(1-u));return Math.max(1,Math.floor((1+(x-1)*(f||1))*100)/100)}
 const crCol=m=>m<2?'var(--loss)':m<10?'var(--gold)':'var(--win)';
 /* ===== ЛАЙВ-РЕЖИМ: общие раунды для всех, окно ставки 6.7с ===== */
-let LIVE={game:null,on:false,round:0,phase:'',result:null,start:0,runEnd:0,off:0,bets:[],pot:0,n:0,myStake:0,myColor:null,placed:false,cash:null,resolved:{},poll:null,raf:null,m:1};
-function liveEnter(g){LIVE={...LIVE,game:g,on:true,round:0,phase:'',result:null,bets:[],myStake:0,myColor:g==='roul'?'r':null,placed:false,cash:null};livePoll(true);render()}
+let LIVE={game:null,on:false,round:0,phase:'',result:null,start:0,runEnd:0,off:0,bets:[],pot:0,n:0,myStake:0,myColor:null,placed:false,cash:null,resolved:{},poll:null,raf:null,cdraf:null,rraf:null,m:1,crashed:false,hist:[],rhist:[]};
+function liveEnter(g){LIVE={...LIVE,game:g,on:true,round:0,phase:'',result:null,bets:[],myStake:0,myColor:g==='roul'?'r':null,placed:false,cash:null,crashed:false,roff:0};livePoll(true);render()}
 function liveLeave(){LIVE.on=false;clearTimeout(LIVE.poll);cancelAnimationFrame(LIVE.raf);LIVE.poll=null}
 async function livePoll(first){if(!LIVE.on||!ONL()){return}
   try{const j=await api('live_tick',{game:LIVE.game,...(LIVE.placed&&LIVE.phase==='bet'?{}:{})});
     LIVE.off=Date.now()-(+j.now||Date.now());const newRound=j.round!==LIVE.round;
-    if(newRound){LIVE.round=j.round;LIVE.placed=false;LIVE.cash=null;LIVE.m=1;LIVE.myStake=0;cancelAnimationFrame(LIVE.raf);LIVE.raf=null}
+    if(newRound){LIVE.round=j.round;LIVE.placed=false;LIVE.cash=null;LIVE.m=1;LIVE.myStake=0;LIVE.crashed=false;LIVE.roff=0;cancelAnimationFrame(LIVE.raf);LIVE.raf=null}
     LIVE.phase=j.phase;LIVE.result=j.result;LIVE.start=+j.start;LIVE.runEnd=LIVE.start+ (+j.run_ms||0)+(+j.bet_ms||0);LIVE.bets=j.bets||[];LIVE.pot=j.pot||0;LIVE.n=j.n||0;
     if(LIVE.phase==='end'&&LIVE.result!=null&&!LIVE.resolved[LIVE.round])resolveLive();
-    if(LIVE.game==='crash'&&LIVE.phase==='run'&&!LIVE.raf)crashLiveLoop();
+    if(LIVE.game==='crash'&&LIVE.phase==='run'&&!LIVE.raf&&!LIVE.crashed)crashLiveLoop();
+    if(LIVE.phase==='bet'&&!LIVE.cdraf)cdLoop();
+    if(LIVE.game==='roul'&&LIVE.phase==='run'&&!LIVE.rraf)liveRoulLoop();
     liveRender();
   }catch(e){}
   clearTimeout(LIVE.poll);if(LIVE.on)LIVE.poll=setTimeout(()=>livePoll(),LIVE.phase==='bet'?900:1400);
 }
 function myBet(){return LIVE.bets.find(b=>b.me)}
-function resolveLive(){LIVE.resolved[LIVE.round]=true;const mb=myBet();if(!mb||!LIVE.myStake)return;const stake=LIVE.myStake;let payout=0,x=0,win=false;
+function resolveLive(){LIVE.resolved[LIVE.round]=true;if(LIVE.result!=null){if(LIVE.game==='crash')LIVE.hist=[LIVE.result,...(LIVE.hist||[])].slice(0,12);else LIVE.rhist=[Math.round(LIVE.result),...(LIVE.rhist||[])].slice(0,14)}const mb=myBet();if(!mb||!LIVE.myStake)return;const stake=LIVE.myStake;let payout=0,x=0,win=false;
   if(LIVE.game==='crash'){const cash=mb.cashout||LIVE.cash;if(cash&&cash<=LIVE.result){win=true;x=cash;payout=Math.floor(stake*cash)}}
   else{const col=rcol(Math.round(LIVE.result));if(mb.color===col){win=true;x=col==='g'?14:2;payout=stake*x}}
   gRec(LIVE.game+'-live',stake,{payout,x,win,live:1});save();
@@ -1673,49 +1692,71 @@ async function liveBet(C){if(LIVE.phase!=='bet'||LIVE.placed)return;const k=gSta
   LIVE.placed=true;LIVE.myStake=k.stake;try{TG&&TG.HapticFeedback.impactOccurred('light')}catch(e){}SND.pop();liveRender();
   try{const j=await api('live_bet',{game:LIVE.game,stake:k.stake,color:LIVE.myColor});if(j.error){LIVE.placed=false;toast(L('Не успел на этот раунд','Missed this round'))}}catch(e){LIVE.placed=false}
   livePoll();}
-function liveCashout(){if(LIVE.game!=='crash'||LIVE.phase!=='run'||!LIVE.placed||LIVE.cash)return;const m=Math.floor(LIVE.m*100)/100;if(m>LIVE.result)return;LIVE.cash=m;SND.win();try{TG&&TG.HapticFeedback.impactOccurred('medium')}catch(e){}
+function liveCashout(){if(LIVE.game!=='crash'||LIVE.phase!=='run'||!LIVE.placed||LIVE.cash||LIVE.crashed)return;const m=Math.floor(LIVE.m*100)/100;if(m>LIVE.result)return;LIVE.cash=m;SND.win();try{TG&&TG.HapticFeedback.impactOccurred('medium')}catch(e){}
   api('live_cashout',{game:'crash',at:m}).catch(()=>{});liveRender();}
+function rktPct(){const r=Math.max(1.2,LIVE.result||2),m=Math.max(1,LIVE.m||1);return Math.min(90,6+84*Math.log(m)/Math.log(r))}
 function crashLiveLoop(){const dur=Math.max(.3,(LIVE.runEnd-LIVE.start)/1000);const kk=Math.log(Math.max(1.01,LIVE.result))/dur;
-  (function loop(){if(!LIVE.on||LIVE.phase!=='run'){LIVE.raf=null;return}const el=(Date.now()-LIVE.off-LIVE.start)/1000;LIVE.m=Math.min(LIVE.result,Math.exp(kk*Math.max(0,el)));
+  (function loop(){if(!LIVE.on||LIVE.phase!=='run'){LIVE.raf=null;return}const el=(Date.now()-LIVE.off-LIVE.start)/1000;const raw=Math.exp(kk*Math.max(0,el));
+    if(raw>=LIVE.result){LIVE.m=LIVE.result;LIVE.crashed=true;LIVE.raf=null;
+      const e=$('#lcm');if(e){e.textContent='x'+LIVE.result.toFixed(2);e.style.color='var(--loss)'}
+      const rk=$('#lrkt');if(rk){rk.textContent='💥';rk.style.bottom=rktPct()+'%'}
+      const st=$('#lcstage');if(st)st.classList.add('boom');try{SND.boom&&SND.boom()}catch(_){}return}
+    LIVE.m=raw;
     if(LIVE.placed&&!LIVE.cash&&UI.cr.useAuto&&UI.cr.auto>1&&LIVE.m>=UI.cr.auto&&UI.cr.auto<=LIVE.result)liveCashout();
-    const e=$('#lcm');if(e){e.textContent='x'+LIVE.m.toFixed(2);e.style.color=LIVE.m>=LIVE.result-.001?'var(--loss)':'var(--acc)'}
+    const e=$('#lcm');if(e){e.textContent='x'+LIVE.m.toFixed(2);e.style.color='var(--acc)'}
+    const rk=$('#lrkt');if(rk)rk.style.bottom=rktPct()+'%';
     const bb=$('#lcbtn');if(bb&&LIVE.placed&&!LIVE.cash)bb.textContent=`💰 ${L('ЗАБРАТЬ','CASH')} ◈ ${num(Math.floor(LIVE.myStake*LIVE.m))}`;
     LIVE.raf=requestAnimationFrame(loop)})();}
+function cdLoop(){cancelAnimationFrame(LIVE.cdraf);(function loop(){if(!LIVE.on||LIVE.phase!=='bet'){LIVE.cdraf=null;return}const e=$('#lcd');if(e&&e.firstChild){const left=Math.max(0,LIVE.start-(Date.now()-LIVE.off));e.firstChild.textContent=(left/1000).toFixed(1)}LIVE.cdraf=requestAnimationFrame(loop)})();}
+function liveRoulLoop(){cancelAnimationFrame(LIVE.rraf);(function loop(){const st=$('#lrstrip');
+    if(!LIVE.on||LIVE.game!=='roul'){LIVE.rraf=null;return}
+    if(LIVE.phase!=='run'){LIVE.rraf=null;if(LIVE.phase==='end')liveRoulLand(true);return}
+    if(st){LIVE.roff=(LIVE.roff||0)+20;st.style.transition='none';st.style.transform=`translateX(${-LIVE.roff}px)`}
+    LIVE.rraf=requestAnimationFrame(loop)})();}
+function liveRoulLand(anim){const st=$('#lrstrip'),wr=$('#lrwrap');if(!st||!wr||LIVE.result==null)return;const n=Math.round(LIVE.result),i=15*3+RSEQ.indexOf(n);st.style.transition=anim?'transform .9s cubic-bezier(.15,.85,.25,1)':'none';st.style.transform=`translateX(${-(i*RIW+40)+wr.clientWidth/2}px)`}
 function liveRender(){if(UI.tab==='burm'&&(UI.bt==='crash'||UI.bt==='roul')&&LIVE.on)render()}
 function liveSeg(g){return`<div class="seg" style="margin-bottom:12px"><button class="${!LIVE.on?'on':''}" data-act="livesw" data-d="0">🎮 ${L('Соло','Solo')}</button><button class="${LIVE.on?'on':''}" data-act="livesw" data-d="1">🔴 ${L('Лайв','Live')}</button></div>`}
+function liveGate(g){return`<div class="card" style="text-align:center;padding:32px 20px"><div style="font-size:42px">🔴</div><h3 style="margin:8px 0 0">${L('Лайв-режим','Live mode')}</h3><p style="color:var(--muted);max-width:360px;margin:10px auto 0">${L('Краш и Дабл идут только общими честными раундами — результат один для всех. Войди через Telegram, чтобы играть.','Crash and Double run only as shared fair rounds — one result for everyone. Log in with Telegram to play.')}</p></div>`}
+function liveConnecting(g){return`<div class="card" style="text-align:center;padding:36px 20px"><div class="rball spin" style="margin:0 auto 12px;width:56px;height:56px;font-size:24px">⏳</div><p style="color:var(--muted)">${L('Подключаемся к лайву…','Connecting to live…')}</p></div>`}
 function betsList(){if(!LIVE.bets.length)return`<div class="empty" style="padding:14px">${L('Пока никто не поставил','No bets yet')}</div>`;
-  return`<div class="lbets">${LIVE.bets.map(b=>{const col=b.color?{r:'#f0525a',b:'#3a3e46',g:'#43e08a'}[b.color]:'';return`<div class="lbet ${b.me?'me':''}"><span class="ln">${b.me?'👉 ':''}${esc(b.nick)}${col?` <i style="background:${col}"></i>`:''}</span><span class="mono">◈${num(b.stake)}${b.cashout?` <span style="color:var(--win)">x${b.cashout.toFixed(2)}</span>`:''}</span></div>`}).join('')}</div>`}
+  return`<div class="lbets">${LIVE.bets.map(b=>{const col=b.color?{r:'#f0525a',b:'#3a3e46',g:'#43e08a'}[b.color]:'';return`<div class="lbet ${b.me?'me':''}"><span class="ln">${b.me?'👉':''}${avaHTML(b.ava,b.nick,22)}<span>${esc(b.nick)}</span>${col?` <i style="background:${col}"></i>`:''}</span><span class="mono">◈${num(b.stake)}${b.cashout?` <span style="color:var(--win)">x${b.cashout.toFixed(2)}</span>`:''}</span></div>`}).join('')}</div>`}
 function liveCountdown(){const left=Math.max(0,LIVE.start-(Date.now()-LIVE.off));return(left/1000).toFixed(1)}
 function vLiveCrash(C){const k=gStake(C,'crash');const bet=LIVE.phase==='bet',run=LIVE.phase==='run';
-  let stage;
-  if(bet)stage=`<div class="lstage"><div class="lbig" style="color:var(--acc)">${liveCountdown()}<small>${L('сек на ставку','s to bet')}</small></div></div>`;
-  else stage=`<div class="lstage"><div class="lbig" id="lcm" style="color:${run?'var(--acc)':'var(--loss)'}">x${(LIVE.result||1).toFixed(2)}</div>${!run&&LIVE.result!=null?`<div style="color:var(--muted)">${L('раунд завершён','round over')}</div>`:''}</div>`;
+  let stage;const crashed=!bet&&(!run||LIVE.crashed);
+  if(bet)stage=`<div class="lstage"><div class="lbig" id="lcd" style="color:var(--acc)">${liveCountdown()}<small>${L('сек на ставку','s to bet')}</small></div></div>`;
+  else stage=`<div class="lcstage${crashed?' boom':''}" id="lcstage"><div class="lctrack"></div><div class="lrkt" id="lrkt" style="bottom:${rktPct()}%">${crashed?'💥':'🚀'}</div><div class="lbig lcm2" id="lcm" style="color:${crashed?'var(--loss)':'var(--acc)'}">x${(run&&!crashed?LIVE.m:LIVE.result||1).toFixed(2)}</div>${crashed?`<div class="lcov">${L('раунд завершён','round over')}</div>`:''}</div>`;
   let btn;
   if(bet&&!LIVE.placed)btn=`<button class="upbtn" data-act="livebet" ${k.ok?'':'disabled'}>📈 ${L('СТАВКА','BET')} ◈ ${num(k.stake)}</button>`;
   else if(bet&&LIVE.placed)btn=`<button class="upbtn" disabled>✓ ${L('Ставка принята','Bet placed')} ◈ ${num(LIVE.myStake)}</button>`;
   else if(run&&LIVE.placed&&!LIVE.cash)btn=`<button class="upbtn" id="lcbtn" data-act="livecash">💰 ${L('ЗАБРАТЬ','CASH')} ◈ ${num(Math.floor(LIVE.myStake*LIVE.m))}</button>`;
   else if(LIVE.cash)btn=`<button class="upbtn" disabled>✓ ${L('Забрано','Cashed')} x${LIVE.cash.toFixed(2)}</button>`;
   else btn=`<button class="upbtn" disabled>⏳ ${L('Ждём раунд','Waiting')}</button>`;
-  return liveSeg('crash')+`<div class="grid2"><div class="card upw"><div class="crwrap" style="min-height:220px;display:grid;place-items:center">${stage}</div>
+  return `<div class="row" style="margin-bottom:12px"><span class="pill live">🔴 ${L('ЛАЙВ','LIVE')}</span><b>${L('Краш','Crash')}</b><span style="font-size:12px;color:var(--muted)">${L('общий раунд для всех','shared round')}</span><span class="sp"></span><span style="font-size:12px;color:var(--muted)">${L('раунд','round')} #${LIVE.round}</span></div>
+  <div class="grid2"><div class="card upw" style="align-items:stretch"><div class="crwrap" style="height:240px;padding:0;width:100%">${stage}</div>
      <div style="display:flex;justify-content:center;margin-top:10px">${btn}</div>
-     <div class="hchips">${(UI.cr.hist||[]).map(m=>`<span style="color:${crCol(m)}">x${m.toFixed(2)}</span>`).join('')||`<span style="color:var(--dim)">${L('общие раунды для всех','shared rounds for everyone')}</span>`}</div></div>
+     <div class="hchips">${(LIVE.hist||[]).map(m=>`<span style="color:${crCol(m)}">x${m.toFixed(2)}</span>`).join('')||`<span style="color:var(--dim)">${L('общие раунды для всех','shared rounds for everyone')}</span>`}</div></div>
    <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">🔴 ${L('Лайв · игроки','Live · players')}</h3><span class="pill">◈ ${num(LIVE.pot)} · ${LIVE.n}</span></div>
      ${bet?stakeUI(C,'crash',LIVE.placed):`<div style="font-size:12px;color:var(--muted);margin:10px 0">${L('Ставки принимаются в начале раунда','Bets open at round start')}</div>`}
      <div style="margin-top:10px">${betsList()}</div>
      <p style="font-size:11px;color:var(--muted);margin-top:12px">${L('Результат раунда один для всех и честный (комиссия ~6%). Личная удача — в соло-режиме.','The round result is the same for everyone and fair (~6% edge). Personal luck is in Solo.')}</p></div></div>`;
 }
 function vLiveRoul(C){const k=gStake(C,'roul'),B=RBET(),bet=LIVE.phase==='bet';const rn=LIVE.result!=null?Math.round(LIVE.result):null,rc=rn!=null?rcol(rn):null;
-  const stage=bet?`<div class="lstage"><div class="lbig" style="color:var(--acc)">${liveCountdown()}<small>${L('сек на ставку','s to bet')}</small></div></div>`
-    :`<div class="lstage"><div class="rball ${rc||''}">${rn!=null?rn:'…'}</div><div style="color:var(--muted);margin-top:6px">${rc?{r:L('Красное','Red'),b:L('Чёрное','Black'),g:L('Зелёное','Green')}[rc]:''}</div></div>`;
-  return liveSeg('roul')+`<div class="grid2"><div class="card"><div class="crwrap" style="min-height:200px;display:grid;place-items:center;background:none">${stage}</div>
-     <div class="rbtns" style="margin-top:12px">${Object.entries(B).map(([c,o])=>`<button class="rbet ${LIVE.myColor===c?'on':''}" data-act="livecol" data-d="${c}" style="background:${o.bg}" ${bet&&!LIVE.placed?'':'disabled'}><b>${o.n}</b><small>x${o.x}</small></button>`).join('')}</div>
-     <div style="display:flex;justify-content:center;margin-top:12px">${bet&&!LIVE.placed?`<button class="upbtn" data-act="livebet" ${k.ok?'':'disabled'}>🎯 ${L('СТАВКА','BET')} ◈ ${num(k.stake)} ${L('на','on')} ${B[LIVE.myColor].n}</button>`:LIVE.placed?`<button class="upbtn" disabled>✓ ${L('Ставка','Bet')} ◈ ${num(LIVE.myStake)}</button>`:`<button class="upbtn" disabled>⏳ ${L('Ждём раунд','Waiting')}</button>`}</div>
-     <div class="hchips">${(UI.ro.hist||[]).map(n=>`<span class="hc ${rcol(n)}">${n}</span>`).join('')}</div></div>
+  const over=LIVE.phase==='end'&&rn!=null;
+  const head=bet?`<div class="lbig" id="lcd" style="font-size:38px;color:var(--acc)">${liveCountdown()}<small>${L('сек на ставку','s to bet')}</small></div>`
+    :over?`<div class="row" style="justify-content:center;gap:10px"><span class="rball ${rc||''}" style="width:50px;height:50px;font-size:22px">${rn}</span><b style="font-size:17px">${rc?{r:L('Красное','Red'),b:L('Чёрное','Black'),g:L('Зелёное','Green')}[rc]:''}</b></div>`
+    :`<div style="color:var(--muted);font-weight:700">🎡 ${L('Крутится…','Spinning…')}</div>`;
+  return `<div class="row" style="margin-bottom:12px"><span class="pill live">🔴 ${L('ЛАЙВ','LIVE')}</span><b>${L('Дабл','Double')}</b><span style="font-size:12px;color:var(--muted)">${L('общий раунд для всех','shared round')}</span><span class="sp"></span><span style="font-size:12px;color:var(--muted)">${L('раунд','round')} #${LIVE.round}</span></div>
+  <div class="card" style="margin-bottom:16px"><div class="strip-wrap" id="lrwrap"><div class="marker"></div><div class="rstrip" id="lrstrip">${rTiles(7)}</div></div>
+     <div style="margin-top:14px;text-align:center;min-height:50px;display:grid;place-items:center">${head}</div>
+     <div class="row" style="margin-top:10px;justify-content:center;gap:4px;flex-wrap:wrap"><span style="font-size:12px;color:var(--muted)">${L('Прошлые','Last')}:</span>${(LIVE.rhist||[]).slice(0,16).map(n=>`<span class="rdot rt ${rcol(n)}" style="width:22px;height:22px;font-size:10px;border-radius:50%">${n}</span>`).join('')||`<span style="color:var(--dim);font-size:12px">${L('общие раунды для всех','shared rounds')}</span>`}</div></div>
+  <div class="grid2"><div class="card"><h3>${L('На что ставим','Bet on')}</h3><div class="rbets">${Object.entries(B).map(([c,o])=>`<button class="${LIVE.myColor===c?'on':''}" style="background:${o.bg}" data-act="livecol" data-d="${c}" ${bet&&!LIVE.placed?'':'disabled'}>${o.n}<div class="mono" style="font-size:20px">x${o.x}</div></button>`).join('')}</div>
+     <div style="display:flex;justify-content:center;margin-top:16px">${bet&&!LIVE.placed?`<button class="upbtn" data-act="livebet" ${k.ok?'':'disabled'}>🎯 ${L('СТАВКА','BET')} ◈ ${num(k.stake)} ${L('на','on')} ${B[LIVE.myColor].n}</button>`:LIVE.placed?`<button class="upbtn" disabled>✓ ${L('Ставка','Bet')} ◈ ${num(LIVE.myStake)}</button>`:`<button class="upbtn" disabled>⏳ ${L('Ждём раунд','Waiting')}</button>`}</div></div>
    <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">🔴 ${L('Лайв · игроки','Live · players')}</h3><span class="pill">◈ ${num(LIVE.pot)} · ${LIVE.n}</span></div>
      ${bet?stakeUI(C,'roul',LIVE.placed):''}
      <div style="margin-top:10px">${betsList()}</div></div></div>`;
 }
-function vCrash(C){if(LIVE.on&&UI.bt==='crash')return vLiveCrash(C);
+function vCrash(C){if(!ONL())return liveGate('crash');if(!LIVE.on||LIVE.game!=='crash'){setTimeout(()=>{if(UI.tab==='burm'&&UI.bt==='crash')liveEnter('crash')},0);return liveConnecting('crash')}return vLiveCrash(C);}
+function vCrashSolo(C){
   const cr=UI.cr,k=gStake(C,'crash'),run=cr.state==='run',busy=cr.state!=='idle';
   let btn;
   if(run)btn=`<button class="upbtn" id="crbtn" data-act="crcash">💰 ${L('ЗАБРАТЬ','CASH OUT')} ◈ ${num(Math.floor(cr.rec.stake*cr.m))}</button>`;
@@ -1785,7 +1826,8 @@ function crashEnd(){
 const RSEQ=[1,14,2,13,3,12,4,0,11,5,10,6,9,7,8],rcol=n=>n===0?'g':n<=7?'r':'b',RIW=86;
 const RBET=()=>({r:{n:L('Красное','Red'),x:2,bg:'linear-gradient(180deg,#f0525a,#b8262f)'},g:{n:L('Зелёное','Green'),x:14,bg:'linear-gradient(180deg,#43e08a,#1c9c55)'},b:{n:L('Чёрное','Black'),x:2,bg:'linear-gradient(180deg,#3a3e46,#1d2026)'}});
 const rTiles=loops=>{const gi={r:'roul_red',b:'roul_black',g:'roul_green'};let h='';for(let i=0;i<loops;i++)RSEQ.forEach(n=>{const g=IMG[gi[rcol(n)]];h+=`<div class="rt ${rcol(n)}"${g?` style="background-image:url(${g}),var(--rtg);background-size:62%,cover;background-position:center;background-repeat:no-repeat"`:''}><span style="text-shadow:0 2px 6px #000">${n}</span></div>`});return h};
-function vRoul(C){if(LIVE.on&&UI.bt==='roul')return vLiveRoul(C);
+function vRoul(C){if(!ONL())return liveGate('roul');if(!LIVE.on||LIVE.game!=='roul'){setTimeout(()=>{if(UI.tab==='burm'&&UI.bt==='roul')liveEnter('roul')},0);return liveConnecting('roul')}return vLiveRoul(C);}
+function vRoulSolo(C){
   const ro=UI.ro,k=gStake(C,'roul'),B=RBET(),cnt={r:0,b:0,g:0};ro.hist.forEach(n=>cnt[rcol(n)]++);
   return liveSeg('roul')+`<div class="card" style="margin-bottom:16px" id="rcard"><div class="strip-wrap" id="rwrap"><div class="marker"></div><div class="rstrip" id="rstrip">${rTiles(3)}</div></div>
     <div class="row" style="margin-top:12px"><span style="font-size:12px;color:var(--muted)">${L('Последние','Last')}:</span><div class="row" style="gap:4px">${ro.hist.slice(0,20).map(n=>`<span class="rdot rt ${rcol(n)}" style="width:22px;height:22px;font-size:10px;border-radius:50%">${n}</span>`).join('')||`<span style="color:var(--dim);font-size:12px">—</span>`}</div><span class="sp"></span><span class="mono" style="font-size:12px;color:var(--muted)">🔴 ${cnt.r} · ⚫ ${cnt.b} · 🟢 ${cnt.g}</span></div></div>
@@ -2089,10 +2131,11 @@ function vTop(C){
   loadTop();
   if(S.settings.topOk!==true)return topRules(C)+(S.settings.topOk===false?vTopList(C):'');
   if(!S.profile.nick.trim())return`<h2>${L('Топ игроков','Leaderboard')}</h2><div class="card" style="max-width:520px"><h3>${L('Сначала профиль','Profile first')}</h3><div class="prof"><div class="avaedit" data-act="ava">${avaHTML(S.profile.ava,'V',72)}</div><div class="fld" style="flex:1"><label>${L('Ник','Nickname')}</label><input type="text" maxlength="20" value="" placeholder="${L('Придумай ник и нажми Enter','Pick a nickname and press Enter')}" data-chg="nick"></div></div></div>`;
-  const me=S.net.uid,view=UI.lb.view==='friends'?'friends':'world';
+  const me=S.net.uid,view=UI.lb.view==='friends'?'friends':'world',banned=ONL()&&ADM.banned;
   let list=(UI.lb.data||[]).filter(p=>p.season===C.sn);
-  if(me&&S.settings.topOk===true&&!list.some(p=>p.id===me))list.push({id:me,...payload(C)});
-  list=list.map(p=>p.id===me?{id:me,...payload(C),prem:isPrem(),aw:(ADM.aw||[]).map(a=>[a.season,a.place])}:p);
+  if(banned)list=list.filter(p=>p.id!==me);
+  else{if(me&&S.settings.topOk===true&&!list.some(p=>p.id===me))list.push({id:me,...payload(C)});
+  list=list.map(p=>p.id===me?{id:me,...payload(C),prem:isPrem(),aw:(ADM.aw||[]).map(a=>[a.season,a.place])}:p);}
   if(view==='friends')list=list.filter(p=>p.id===me||S.friends.includes(p.id));
   const wk=mondayOf(today());list.forEach(p=>{p.wd=p.week===wk?(+p.weekDelta||0):0});
   list.sort(view==='friends'?(a,b)=>b.wd-a.wd||b.elo-a.elo:(a,b)=>(+b.elo||0)-(+a.elo||0));
@@ -2105,6 +2148,7 @@ function vTop(C){
     <td style="text-align:right">${p.id===me?'':S.friends.includes(p.id)?(view==='friends'?`<button class="ib" data-act="unfriend" data-id="${esc(p.id)}">✕</button>`:`<span style="color:var(--win)">✓</span>`):`<button class="btn" data-act="friend" data-id="${esc(p.id)}">+ ${L('в друзья','friend')}</button>`}</td></tr>`).join('');
   return`<div class="row"><div><h2>${view==='friends'?L('Друзья · дуэль недели','Friends · weekly duel'):L('Топ игроков','Leaderboard')}</h2><p class="sub">${seasonName(C.sn)} · ${view==='friends'?L('кто больше поднял ELO с понедельника — тот и лидер','whoever gained the most ELO since Monday leads'):L('рейтинг по ELO этого сезона','ranked by this season\'s ELO')}</p></div><span class="sp"></span>
     <div class="seg"><button class="${view==='friends'?'on':''}" data-act="lbview" data-d="friends">🤝 ${L('Друзья','Friends')} ${S.friends.length}</button><button class="${view==='world'?'on':''}" data-act="lbview" data-d="world">🌍 ${L('Мировой топ','World top')}</button></div><button class="btn" data-act="lbref">↻</button></div>
+  ${banned?`<div class="card" style="border-color:var(--loss);margin-bottom:12px"><div class="row"><span style="font-size:22px">⛔</span><div><b style="color:var(--loss)">${L('Ты вне топа','You are out of the board')}</b><div style="font-size:13px;color:var(--muted)">${L(`Администратор убрал тебя из рейтинга. Примерно #${(list.filter(p=>(+p.elo||0)>C.elo).length)+1} по ELO ${C.elo}, но в топе тебя не видно.`,`The admin removed you from the ranking. Around #${(list.filter(p=>(+p.elo||0)>C.elo).length)+1} by ELO ${C.elo}, but you don't appear on the board.`)}</div></div></div></div>`:''}
   ${UI.lb.err?`<div class="card" style="border-color:var(--loss);margin-bottom:12px;color:var(--loss)">${esc(UI.lb.err)}</div>`:''}${UI.netErr?`<div class="card" style="border-color:var(--gold);margin-bottom:12px;color:var(--gold)">${L('Не удалось отправить профиль','Could not upload profile')}: ${esc(UI.netErr)}</div>`:''}
   <div class="under" style="margin-top:0">
     <div class="card" style="overflow-x:auto">${UI.lb.loading&&!UI.lb.data?`<div class="empty">${L('Загружаю…','Loading…')}</div>`:`<table class="lb"><thead><tr><th>#</th><th>${L('Игрок','Player')}</th><th>ELO</th><th>W / L</th><th>${L('Неделя','Week')}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>
@@ -2229,7 +2273,7 @@ function vProfile(C){const FULLPLAN0=Math.max(1,(CFG.fullPlan!=null&&CFG.fullPla
 
 /* ---- объявление и админка ---- */
 function annBanner(){let h='';const nv=(S.voids||[]).filter(v=>!v.seen);
-  if(nv.length)h+=`<div class="card" style="border-color:var(--loss);margin-bottom:14px"><b style="color:var(--loss)">❌ ${L('Модерация отменила','Moderators voided')}</b>${nv.map(v=>`<div style="font-size:13px;margin-top:6px">• <b>${esc(v.t)}</b> <span style="color:var(--dim)">(${fmtD(v.d)})</span> — ${esc(v.r)}</div>`).join('')}<button class="btn" data-act="voidseen" style="margin-top:10px">${L('Понятно','Got it')}</button></div>`;if(ONL()&&ADM.banned)h+=`<div class="card" style="border-color:var(--loss);color:var(--loss);margin-bottom:14px">⛔ ${L('Ты убран из онлайн-топа администратором.','You were removed from the online board by the admin.')}</div>`;
+  if(nv.length)h+=`<div class="card" style="border-color:var(--loss);margin-bottom:14px"><b style="color:var(--loss)">❌ ${L('Модерация отменила','Moderators voided')}</b>${nv.map(v=>`<div style="font-size:13px;margin-top:6px">• <b>${esc(v.t)}</b> <span style="color:var(--dim)">(${fmtD(v.d)})</span> — ${esc(v.r)}</div>`).join('')}<button class="btn" data-act="voidseen" style="margin-top:10px">${L('Понятно','Got it')}</button></div>`;if(ONL()&&ADM.banned&&UI.tab!=='top')h+=`<div class="card" style="border-color:var(--loss);color:var(--loss);margin-bottom:14px">⛔ ${L('Ты убран из онлайн-топа администратором.','You were removed from the online board by the admin.')}</div>`;
   if(ONL()&&ADM.ann)h+=`<div class="card" style="border-color:var(--gold);margin-bottom:14px"><b style="color:var(--gold)">📢 ${L('Объявление','Announcement')}</b><div style="margin-top:6px;white-space:pre-wrap">${esc(ADM.ann)}</div></div>`;return h}
 UI.adm={list:null,sel:null,det:null,q:'',loading:false,err:''};
 async function admLoad(){UI.adm.loading=true;try{const j=await api('admin_list');UI.adm.list=j.players||[];UI.adm.ann=typeof j.ann==='string'?j.ann:'';UI.adm.err=''}catch(e){UI.adm.err=String(e.message||e)}UI.adm.loading=false;if(UI.tab==='admin')render()}
@@ -2327,7 +2371,7 @@ function admGame(){const g=(o,k)=>o&&o[k]!=null?o[k]:'';const c=CFG||{},d=DEF||{
    <div class="card"><h3>🧢 ${L('Лимиты в день','Daily caps')}</h3>
     ${num('caps.eloCat',L('ELO с одной категории','ELO per category'),D0.eloCat)}${num('caps.eloDay',L('ELO за все дела','ELO from all tasks'),D0.eloDay)}${num('caps.eloQuest',L('ELO за квесты','ELO from quests'),D0.eloQuest)}
     ${num('caps.coinCat',L('Монет с одной категории','Coins per category'),D0.coinCat)}${num('caps.coinDay',L('Монет за все дела','Coins from all tasks'),D0.coinDay)}${num('caps.coinQuest',L('Монет за квесты','Coins from quests'),D0.coinQuest)}${num('caps.coinBonus',L('Монет за недельные бонусы','Coins from weekly bonuses'),D0.coinBonus)}
-    ${num('maxEloDay',L('Сервер: макс. рост ELO в сутки','Server: max ELO gain per day'),300)}</div>
+    ${num('maxEloDay',L('Сервер: макс. рост ELO в сутки','Server: max ELO gain per day'),80)}${num('seasonEloMax',L('Макс. прирост ELO за сезон (потолок = старт + это)','Max ELO gain per season (ceiling = start + this)'),4000)}</div>
    <div class="card"><h3>📐 ${L('Правила ELO','ELO rules')}</h3>
     ${num('fixed.eloTask',L('ELO за дело','ELO per task'),F0.eloTask)}${num('fixed.eloRoutine',L('ELO за рутину','ELO per routine'),F0.eloRoutine)}${num('fixed.eloStep',L('ELO за шаг квеста','ELO per quest step'),F0.eloStep)}
     ${num('fixed.mainElo',L('ELO за сюжетный квест','ELO per main quest'),F0.mainElo)}${num('fixed.sideElo',L('ELO за приключение','ELO per adventure'),F0.sideElo)}${num('fixed.win',L('Порог победы дня, %','Day win threshold, %'),F0.win)}
@@ -2729,7 +2773,7 @@ const A={
   arelapse:id=>{ask(L(`Точно сорвался? Счётчик обнулится, −${S.settings.relapsePen||10} ELO.`,`Slipped for real? Counter resets, −${S.settings.relapsePen||10} ELO.`),()=>{const a=find(S.anti,id);if(!a.relapses.includes(today()))a.relapses.push(today());SND.lose()},L('Да, сорвался','Yes, I slipped'));return'skip'},
   aundo:id=>{const a=find(S.anti,id);a.relapses=a.relapses.filter(x=>x!==today());SND.undo()},
   rsort:(_,d)=>{const r=UI.rsort||{k:'',dir:1};if(r.k===d){if(r.dir>0)r.dir=-1;else{r.k='';r.dir=1}}else{r.k=d;r.dir=1}UI.rsort=r;SND.tick()},
-  bt:(_,d)=>{if(LIVE.on&&d!==UI.bt)liveLeave();UI.bt=d;if(LIVE.on&&(d==='crash'||d==='roul'))liveEnter(d);SND.tick();window.scrollTo(0,0)},
+  bt:(_,d)=>{if(LIVE.on&&d!==UI.bt)liveLeave();UI.bt=d;if((d==='crash'||d==='roul')&&ONL())liveEnter(d);SND.tick();window.scrollTo(0,0)},
   go:(_,d)=>{SND.tick();if(d==='focus'){UI.focusOpen=true;renderFocus();return'skip'}if(d==='report'){showReport(mondayOf(today()));return'skip'}
     if(d.startsWith('burm:')){UI.tab='burm';UI.bt=d.slice(5)}else UI.tab=d;saveUI();window.scrollTo(0,0)},
   gst:(id,d)=>{const C=compute(),l=gLimit(C);UI.gs[id]=Math.max(1,d==='max'?l.max:Math.min(l.max,Math.floor(Math.max(0,C.balance)*+d)));SND.tick()},
@@ -2852,7 +2896,7 @@ $('.brand').innerHTML=(ic('logo_small',28)||'')+'<span>VOZ<i>DUH</i></span>';$('
 if(IMG.card_back)document.head.insertAdjacentHTML('beforeend',`<style>.cardx.back{background:#0c0d0f url(${IMG.card_back}) center/cover!important;border:2px solid #2f343b!important}</style>`);
 if(IMG.ui_camera)document.head.insertAdjacentHTML('beforeend',`<style>.avaedit::after{background:var(--panel2) url(${IMG.ui_camera}) center/78% no-repeat!important}</style>`);
 if(IMG.bj_table)document.head.insertAdjacentHTML('beforeend',`<style>.felt{background:linear-gradient(rgba(8,10,12,.45),rgba(8,10,12,.65)),url(${IMG.bj_table}) center/cover!important}</style>`);
-if(IMG.crash_bg)document.head.insertAdjacentHTML('beforeend',`<style>.crwrap{background:linear-gradient(rgba(8,10,12,.35),rgba(8,10,12,.55)),url(${IMG.crash_bg}) center/cover!important}</style>`);
+document.head.insertAdjacentHTML('beforeend',`<style>.crwrap{background:radial-gradient(ellipse at 50% 115%,color-mix(in srgb,var(--acc) 14%,var(--bg)),var(--bg) 72%)!important}</style>`);
 let curDay=today();setInterval(()=>{if(today()!==curDay&&!UI.busy&&!UI.u.spinning){curDay=today();UI.reportChecked=false;render();setTimeout(loginModal,500)}else if(wd(today())===7&&new Date().getHours()>=18&&S.reportSeen!==mondayOf(today())&&$('#modal').classList.contains('hidden')){S.reportSeen=mondayOf(today());save();showReport(S.reportSeen)}},60000);
 render();
 cloudBoot();
